@@ -249,7 +249,7 @@ public class HamRecorder {
      * One-shot: the monitor stops listening after reaching the specified duration, and the recorder removes it.
      * Looping: after reaching the specified duration, it resets and continues monitoring. This mode is convenient for generating waveform table data.
      */
-    static class VoiceDataMonitor {
+    public static class VoiceDataMonitor {
         private final String TAG = "GetVoiceData";
         private final float[] voiceData;//recording data. Size is determined by duration, sampling rate, and bit depth.
         private int dataCount;//counter, current amount of data acquired
