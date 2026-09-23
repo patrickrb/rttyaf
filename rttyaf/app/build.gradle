@@ -27,7 +27,7 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "radio.ks3ckc.ft8af"
+        applicationId "radio.ks3ckc.rttyaf"
         minSdk 23
         targetSdk 35
         // Required for the androidTest suite to actually run: our instrumented
