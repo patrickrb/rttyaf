@@ -59,12 +59,24 @@ class RttyDecoder(
     private val hysteresis = 0.1
     private var curMark = true
 
+    // --- squelch (energy gate) ---------------------------------------------
+    // Without this the slicer decides purely on the *normalised* mark/space
+    // difference, so on an idle/noisy channel the ratio still crosses the
+    // hysteresis band and the framer prints random characters. A light EMA of
+    // the total tone energy, compared against [RttyConfig.squelchFloor], gates
+    // edge detection and emission so we only decode when a carrier is present.
+    private var energyEma = 0.0
+    private var squelchOpen = false
+
     // --- clock recovery / framing ------------------------------------------
     private var mode = Mode.SEARCH
     private var prevMark = true
-    // Sample offsets from the start edge at which to sample: start-centre, five
-    // data-bit centres, then a point inside the stop bit.
-    private val sampleOffsets: IntArray = IntArray(7) { i -> ((i + 0.5) * spb).roundToInt() }
+    // Sample offsets from the start edge: the start-bit centre (validation) plus
+    // the five data-bit centres. We emit and re-sync right after the last data
+    // bit rather than waiting for a fixed stop-bit point, so the framer never
+    // over-runs the next start edge when stopBits < 0.5 (the stop level isn't
+    // needed to decode — real links lose it under noise anyway).
+    private val sampleOffsets: IntArray = IntArray(6) { i -> ((i + 0.5) * spb).roundToInt() }
     private var samplesSinceEdge = 0
     private var nextTarget = 0
     private var codeBits = 0
@@ -77,6 +89,8 @@ class RttyDecoder(
         markAngle = 0.0; spaceAngle = 0.0
         iMark = 0.0; qMark = 0.0; iSpace = 0.0; qSpace = 0.0
         curMark = true
+        energyEma = 0.0
+        squelchOpen = false
         mode = Mode.SEARCH
         prevMark = true
         samplesSinceEdge = 0
@@ -102,8 +116,9 @@ class RttyDecoder(
             updateSlicer(s.toDouble())
             when (mode) {
                 Mode.SEARCH -> {
-                    // Falling edge (mark→space) starts a frame.
-                    if (prevMark && !curMark) {
+                    // Falling edge (mark→space) starts a frame — but only when the
+                    // squelch is open, so noise never triggers a frame.
+                    if (squelchOpen && prevMark && !curMark) {
                         mode = Mode.RECEIVE
                         samplesSinceEdge = 0
                         nextTarget = 0
@@ -144,13 +159,20 @@ class RttyDecoder(
         val markMag = iMark * iMark + qMark * qMark
         val spaceMag = iSpace * iSpace + qSpace * qSpace
         val total = markMag + spaceMag + 1e-12
+
+        // Squelch: a light EMA of the tone energy, gated against the floor. A
+        // carrier settles energyEma to ~mark energy within the encoder's mark
+        // preamble; band noise stays well below the floor.
+        energyEma += SQUELCH_EMA_ALPHA * (total - energyEma)
+        squelchOpen = !config.squelch || energyEma > config.squelchFloor
+
         val norm = (markMag - spaceMag) / total
         if (norm > hysteresis) curMark = true
         else if (norm < -hysteresis) curMark = false
         // else: inside the dead-band, hold the previous decision
     }
 
-    /** Handle the sampling point [index] (0=start,1..5=data,6=stop) for a frame. */
+    /** Handle the sampling point [index] (0=start, 1..5=data) for a frame. */
     private fun onSamplePoint(index: Int, sb: StringBuilder) {
         when (index) {
             0 -> {
@@ -160,29 +182,39 @@ class RttyDecoder(
             }
             in 1..5 -> {
                 if (curMark) codeBits = codeBits or (1 shl (index - 1)) // LSB first
-            }
-            6 -> {
-                // Stop bit reached; emit the assembled code and re-sync. (The
-                // stop level isn't required to be valid to still decode the
-                // character — real links often lose the stop under noise.)
-                emitCode(codeBits, sb)
-                mode = Mode.SEARCH
-                prevMark = curMark // avoid a phantom edge inside the stop bit
+                if (index == 5) {
+                    // All five data bits sampled at their centres; emit and
+                    // re-sync immediately. Returning to SEARCH here (rather than
+                    // at a fixed 6.5-bit stop point) means the framer is ready
+                    // for the next start edge regardless of stop-bit length.
+                    emitCode(codeBits, sb)
+                    mode = Mode.SEARCH
+                    prevMark = curMark // suppress a phantom edge as the stop mark rises
+                }
             }
         }
     }
 
     /** Apply shift/USOS logic to a completed 5-bit [code] and emit any char. */
     private fun emitCode(code: Int, sb: StringBuilder) {
+        // A frame that completed while the squelch was closed is noise — the
+        // shift codes still track (cheap, keeps us aligned) but printable
+        // characters are suppressed so the RX pane stays clean.
         when (code) {
             Baudot.LTRS -> figures = false
             Baudot.FIGS -> figures = true
             else -> {
+                if (!squelchOpen) return
                 val ch = Baudot.decode(code, figures) ?: return
                 sb.append(ch)
                 onChar?.invoke(ch)
                 if (config.unshiftOnSpace && code == Baudot.SPACE) figures = false
             }
         }
+    }
+
+    private companion object {
+        /** EMA smoothing for the squelch energy estimate (~settles within a few bits). */
+        const val SQUELCH_EMA_ALPHA = 0.05
     }
 }

@@ -20,9 +20,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +53,7 @@ import radio.ks3ckc.ft8af.theme.TextDim
 import radio.ks3ckc.ft8af.theme.TextFaint
 import radio.ks3ckc.ft8af.theme.TextMuted
 import radio.ks3ckc.ft8af.theme.TextPrimary
+import kotlinx.coroutines.flow.collectLatest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -123,21 +126,7 @@ fun OperateScreen(state: RttyAppState) {
 
         // ---- RX + TX panes ----
         Column(Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val rxScroll = rememberScrollState()
-            LaunchedEffect(engine.rxText) { rxScroll.scrollTo(rxScroll.maxValue) }
-            Box(
-                Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                    .background(BgSurface).border(1.dp, Border, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-                    .verticalScroll(rxScroll)
-            ) {
-                val body = engine.rxText.ifEmpty { "Listening for RTTY…  tap TEST to self-decode a loopback signal." }
-                Text(
-                    body + "▮",
-                    color = if (engine.rxText.isEmpty()) TextDim else TextPrimary,
-                    fontSize = 13.sp, fontFamily = GeistMonoFamily, lineHeight = 20.sp,
-                )
-            }
+            RxPane(engine, Modifier.weight(1f).fillMaxWidth())
             // TX pane
             Row(
                 Modifier.height(46.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
@@ -166,7 +155,10 @@ fun OperateScreen(state: RttyAppState) {
             val isDupe = state.log.any { it.call.equals(state.call, ignoreCase = true) && state.call.isNotBlank() }
             EntryField("CALL", state.call, Signal, Modifier.weight(1.4f), isDupe) { state.call = it.uppercase() }
             EntryField("RST S", state.rstSent, Accent, Modifier.weight(1f)) { state.rstSent = it }
-            EntryField("EXCH", state.myExchange, Accent, Modifier.weight(1f)) { state.myExchange = it.uppercase() }
+            // The worked station's exchange (their grid/zone/serial), stored with
+            // the QSO. Our own exchange ({EXCH} in macros) is state.myExchange,
+            // edited on the Contest screen — typing here must not change it.
+            EntryField("EXCH R", state.rcvdExchange, Accent, Modifier.weight(1f)) { state.rcvdExchange = it.uppercase() }
             Box(
                 Modifier.width(58.dp).height(52.dp).clip(RoundedCornerShape(10.dp))
                     .background(if (state.call.isNotBlank()) Signal else BgSurface2)
@@ -223,14 +215,45 @@ fun OperateScreen(state: RttyAppState) {
     }
 }
 
+/**
+ * RX text pane. Isolated so decoded-text updates recompose only this subtree,
+ * not the whole Operate screen, and so the auto-scroll follows layout.
+ */
+@Composable
+private fun RxPane(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modifier) {
+    val rxScroll = rememberScrollState()
+    // Follow the newest line by observing maxValue *after* the taller content is
+    // laid out, rather than reading it the instant rxText changes (which is
+    // pre-layout, so it would scroll to the previous, shorter extent).
+    LaunchedEffect(rxScroll) {
+        snapshotFlow { rxScroll.maxValue }.collectLatest { rxScroll.scrollTo(it) }
+    }
+    Box(
+        modifier.clip(RoundedCornerShape(12.dp))
+            .background(BgSurface).border(1.dp, Border, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .verticalScroll(rxScroll)
+    ) {
+        val rx = engine.rxText
+        val body = rx.ifEmpty { "Listening for RTTY…  tap TEST to self-decode a loopback signal." }
+        Text(
+            body + "▮",
+            color = if (rx.isEmpty()) TextDim else TextPrimary,
+            fontSize = 13.sp, fontFamily = GeistMonoFamily, lineHeight = 20.sp,
+        )
+    }
+}
+
 @Composable
 private fun Waterfall(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modifier) {
-    val history = remember { ArrayDeque<FloatArray>() }
+    // Snapshot-backed so appending a spectrum column invalidates the Canvas draw;
+    // a plain ArrayDeque would only repaint on incidental recomposition.
+    val history = remember { mutableStateListOf<FloatArray>() }
     LaunchedEffect(engine.spectrum) {
         val col = engine.spectrum
         if (col.isNotEmpty()) {
-            history.addLast(col)
-            while (history.size > MAX_ROWS) history.removeFirst()
+            history.add(col)
+            while (history.size > MAX_ROWS) history.removeAt(0)
         }
     }
     Box(modifier) {
@@ -335,11 +358,14 @@ private fun logQso(state: RttyAppState) {
         0,
         RttyLogEntry(
             call = state.call.uppercase(), band = state.bandShort, timeUtc = utcNow(),
-            rstSent = state.rstSent, rstRcvd = state.rstRcvd, synced = false,
+            rstSent = state.rstSent, rstRcvd = state.rstRcvd,
+            exchSent = state.myExchange, exchRcvd = state.rcvdExchange, serial = state.serial,
+            synced = false,
         ),
     )
     state.serial += 1
     state.call = ""
+    state.rcvdExchange = ""
 }
 
 private fun utcNow(): String {

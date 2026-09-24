@@ -142,6 +142,35 @@ class RttyModemTest {
     }
 
     @Test
+    fun squelch_suppressesNoiseOnlyInput() {
+        // No carrier — just band noise. With squelch on, the framer must not
+        // emit random Baudot; with squelch off it decodes the noise into junk.
+        val rng = Random(7L)
+        val noise = FloatArray(24000) { (rng.nextGaussian() * 0.2).toFloat() }
+        val gated = RttyDecoder(RttyConfig(baudRate = 45.45, squelch = true)).process(noise)
+        val ungated = RttyDecoder(RttyConfig(baudRate = 45.45, squelch = false)).process(noise.copyOf())
+        assertThat(gated.length).isAtMost(1)
+        assertThat(ungated.length).isGreaterThan(gated.length)
+    }
+
+    @Test
+    fun squelchDisabled_copiesWeakSignalBelowFloor() {
+        // A low-amplitude signal whose tone energy sits under the squelch floor
+        // is gated when squelch is on but still decodes with squelch off.
+        val cfg = RttyConfig(baudRate = 45.45, squelch = false)
+        val weak = RttyEncoder(cfg, amplitude = 0.05).encode("DE KS3CKC")
+        assertThat(RttyDecoder(cfg).process(weak)).contains("DE KS3CKC")
+    }
+
+    @Test
+    fun roundTrip_fractionalStopBitsBelowHalf() {
+        // stopBits < 0.5 means the next start edge arrives sooner than the old
+        // fixed 6.5-bit stop sample; the framer must still catch every character.
+        val cfg = RttyConfig(baudRate = 45.45, stopBits = 0.3)
+        assertThat(roundTrip("AB CD 599", cfg)).contains("AB CD 599")
+    }
+
+    @Test
     fun textToCodes_usosReshiftsAfterSpace() {
         val cfg = RttyConfig(baudRate = 45.45, unshiftOnSpace = true)
         // "1 2": FIGS,1,SPACE,(USOS->LETTERS)FIGS,2. The second FIGS proves the
