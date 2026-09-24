@@ -28,7 +28,6 @@
     <!-- Foreground RX service: keep FT8 decode + mic capture alive in the background
          (Android 14 mutes background mic without a microphone-typed foreground service). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- Android Auto: NAVIGATION-category car app that draws its QSO map on the
          car Surface (see QsoStatusScreen/CarMapSurfaceRenderer). -->
@@ -92,12 +91,6 @@
             android:name=".bluetooth.BluetoothSerialService"
             android:exported="false" />
 
-        <!-- Keeps RX decode + audio capture running when the app is backgrounded or
-             screen-off so CQ-reply / QSO-complete alerts keep firing. -->
-        <service
-            android:name="com.k1af.ft8af.service.RxForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
 
         <!-- Persists the user's per-app language choice (AppCompatDelegate
              .setApplicationLocales) on Android 12 and below. On Android 13+
