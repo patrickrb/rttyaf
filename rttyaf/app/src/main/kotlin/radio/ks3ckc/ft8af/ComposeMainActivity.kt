@@ -182,7 +182,12 @@ class ComposeMainActivity : AppCompatActivity() {
         setContent {
             FT8AFTheme {
                 var showSplash by remember { mutableStateOf(true) }
-                val rttyEngine = remember { radio.ks3ckc.ft8af.rtty.RttyEngine(mainViewModel.hamRecorder) }
+                val rttyEngine = remember {
+                    radio.ks3ckc.ft8af.rtty.RttyEngine(
+                        mainViewModel.hamRecorder,
+                        mainViewModel.ft8TransmitSignal,
+                    )
+                }
                 androidx.compose.runtime.LaunchedEffect(Unit) { rttyEngine.start() }
                 Crossfade(
                     targetState = showSplash,

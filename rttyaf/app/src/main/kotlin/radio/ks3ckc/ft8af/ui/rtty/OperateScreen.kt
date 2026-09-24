@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,6 +64,10 @@ import java.util.TimeZone
 fun OperateScreen(state: RttyAppState) {
     val engine = state.engine
     val cfg = engine.config
+    // Real transmit state from the engine's TX backend (true while an over is on
+    // the air), so the TX pane, banner and TX/STOP button reflect the actual rig
+    // keying rather than a UI-only toggle.
+    val txOn by engine.transmittingLive.observeAsState(false)
 
     var utc by remember { mutableStateOf(utcNow()) }
     LaunchedEffect(Unit) {
@@ -130,13 +135,13 @@ fun OperateScreen(state: RttyAppState) {
             // TX pane
             Row(
                 Modifier.height(46.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                    .background(if (state.txActive) SignalSoft else BgSurface)
-                    .border(1.dp, if (state.txActive) Signal else Border, RoundedCornerShape(12.dp))
+                    .background(if (txOn) SignalSoft else BgSurface)
+                    .border(1.dp, if (txOn) Signal else Border, RoundedCornerShape(12.dp))
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(if (state.txActive) "TX" else "TX BUF", color = if (state.txActive) Signal else TextFaint, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (txOn) "TX" else "TX BUF", color = if (txOn) Signal else TextFaint, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 Text(
                     state.txPreview.ifEmpty { "—" },
                     color = if (state.txPreview.isEmpty()) TextDim else Color(0xFFFFD7A0),
@@ -205,11 +210,15 @@ fun OperateScreen(state: RttyAppState) {
             ) { Text("TEST", color = Signal, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
             Box(
                 Modifier.width(84.dp).height(44.dp).clip(RoundedCornerShape(12.dp))
-                    .background(if (state.txActive) StatusBad else Accent)
-                    .clickable { state.txActive = !state.txActive },
+                    .background(if (txOn) StatusBad else Accent)
+                    .clickable {
+                        // TX sends the staged buffer (key → modulate → unkey);
+                        // STOP aborts an over in progress.
+                        if (txOn) engine.stopTx() else engine.transmit(state.txPreview)
+                    },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(if (state.txActive) "STOP" else "TX", color = BgApp, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(if (txOn) "STOP" else "TX", color = BgApp, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

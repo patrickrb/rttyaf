@@ -57,7 +57,6 @@ class RttyAppState(val engine: RttyEngine) {
     var myExchange by mutableStateOf("FN20")
     /** The worked station's exchange, typed on Operate and stored with the QSO. */
     var rcvdExchange by mutableStateOf("")
-    var txActive by mutableStateOf(false)
     var txPreview by mutableStateOf("")
 
     val macros = mutableStateListOf(

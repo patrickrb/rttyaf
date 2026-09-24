@@ -3,6 +3,10 @@ package radio.ks3ckc.ft8af.rtty
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import com.k1af.ft8af.GeneralVariables
+import com.k1af.ft8af.ft8transmit.FT8TransmitSignal
 import com.k1af.ft8af.wave.HamRecorder
 
 /**
@@ -18,7 +22,19 @@ import com.k1af.ft8af.wave.HamRecorder
  * State updates happen on the recorder's callback thread; Compose snapshot state
  * is safe to write off the main thread.
  */
-class RttyEngine(private val hamRecorder: HamRecorder?) {
+class RttyEngine(
+    private val hamRecorder: HamRecorder?,
+    private val transmitSignal: FT8TransmitSignal? = null,
+) {
+
+    // Stable fallback so [transmittingLive] is non-null (and safe to observe
+    // unconditionally in Compose) even when no TX backend is wired — e.g. tests
+    // or previews that construct the engine without a transmitSignal.
+    private val noTxState = MutableLiveData(false)
+
+    /** Live TX state (true while an over is on the air), for the UI to observe. */
+    val transmittingLive: LiveData<Boolean>
+        get() = transmitSignal?.mutableIsRttyTransmitting ?: noTxState
 
     var config by mutableStateOf(RttyConfig())
         private set
@@ -102,6 +118,29 @@ class RttyEngine(private val hamRecorder: HamRecorder?) {
         }
     }
 
+    /**
+     * Modulate [text] to an RTTY (Baudot-FSK) waveform at the sound-card rate and
+     * transmit it over the air (key → send → unkey), delegating keying + audio
+     * routing to the shared [FT8TransmitSignal]. Returns false when there is no
+     * TX backend, nothing to send, or the backend blocks the audio route.
+     *
+     * The waveform is generated at [GeneralVariables.audioSampleRate] (not the
+     * 12 kHz RX rate) so the AudioTrack plays the tones at the correct pitch.
+     */
+    fun transmit(text: String): Boolean {
+        val tx = transmitSignal ?: return false
+        val msg = text.trim()
+        if (msg.isEmpty()) return false
+        val rate = txSampleRate(GeneralVariables.audioSampleRate, config.sampleRate)
+        val pcm = RttyEncoder(config.copy(sampleRate = rate)).encode(txMessage(msg))
+        return tx.transmitRtty(pcm, rate)
+    }
+
+    /** Abort an in-progress transmission (STOP). No-op if not transmitting. */
+    fun stopTx() {
+        transmitSignal?.stopRttyTx()
+    }
+
     /** Swap demod parameters (baud/shift/tones); rebuilds the decoder and re-taps if live. */
     fun applyConfig(newConfig: RttyConfig) {
         // Under audioLock so the decoder swap can't land mid-process() on the
@@ -124,7 +163,7 @@ class RttyEngine(private val hamRecorder: HamRecorder?) {
      * signal would. Wired to a dev affordance on the Operate screen.
      */
     fun injectLoopbackTest(text: String = "CQ CQ DE KS3CKC KS3CKC K") {
-        val samples = RttyEncoder(config).encode(" $text\r\n")
+        val samples = RttyEncoder(config).encode(txMessage(text))
         // Same lock as onAudio(): the live decoder/fft must not be entered from
         // two threads (TEST button on the main thread vs. RX on the audio thread).
         synchronized(audioLock) {
@@ -142,3 +181,19 @@ class RttyEngine(private val hamRecorder: HamRecorder?) {
         const val DISPLAY_MAX_HZ = 3000.0
     }
 }
+
+/**
+ * Wrap outgoing operator text as an RTTY over: a leading idle space (gives the
+ * receiver a resting character before the payload) and a trailing CR/LF (the
+ * teleprinter line-ending convention). Pure — unit-tested.
+ */
+internal fun txMessage(text: String): String = " ${text.trim()}\r\n"
+
+/**
+ * Resolve the sample rate to modulate a transmission at: prefer the sound-card
+ * rate ([GeneralVariables.audioSampleRate]), but fall back to the modem's own
+ * [fallback] rate if the reported audio rate is implausibly low (misconfig),
+ * so we never build an AudioTrack at, say, 0 Hz. Pure — unit-tested.
+ */
+internal fun txSampleRate(audioRate: Int, fallback: Int): Int =
+    if (audioRate >= 8000) audioRate else fallback
