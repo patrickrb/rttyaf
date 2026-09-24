@@ -180,4 +180,38 @@ class RttyModemTest {
             Baudot.LTRS, Baudot.FIGS, 0x17, Baudot.SPACE, Baudot.FIGS, 0x13,
         ).inOrder()
     }
+
+    // ---- TX wiring (feat/rtty-tx) ------------------------------------------
+
+    @Test
+    fun txMessage_framesWithLeadingSpaceAndCrlf() {
+        // The over is wrapped with a leading idle space and a trailing CR/LF so a
+        // receiver has a resting character before the payload and a clean line end.
+        assertThat(txMessage("CQ DE KS3CKC")).isEqualTo(" CQ DE KS3CKC\r\n")
+        // Operator whitespace is trimmed before framing so double spacing/newlines
+        // don't leak into the wrapped message.
+        assertThat(txMessage("  TEST  ")).isEqualTo(" TEST\r\n")
+    }
+
+    @Test
+    fun txSampleRate_prefersSoundCardRateButFallsBackWhenImplausible() {
+        // Normal case: use the reported sound-card rate.
+        assertThat(txSampleRate(audioRate = 48000, fallback = 12000)).isEqualTo(48000)
+        assertThat(txSampleRate(audioRate = 44100, fallback = 12000)).isEqualTo(44100)
+        // Misconfigured / unset audio rate falls back to the modem's own rate so
+        // we never build an AudioTrack at an impossible rate.
+        assertThat(txSampleRate(audioRate = 0, fallback = 12000)).isEqualTo(12000)
+        assertThat(txSampleRate(audioRate = 100, fallback = 12000)).isEqualTo(12000)
+    }
+
+    @Test
+    fun txWaveform_atSoundCardRate_isDecodable() {
+        // Transmit modulates at the sound-card rate (e.g. 48 kHz), not the 12 kHz
+        // RX rate. Prove that waveform still round-trips: same tones, more samples.
+        val base = RttyConfig(baudRate = 45.45)
+        val txCfg = base.copy(sampleRate = 48000)
+        val samples = RttyEncoder(txCfg).encode(txMessage("CQ DE KS3CKC"))
+        val decoded = RttyDecoder(txCfg).process(samples)
+        assertThat(decoded).contains("CQ DE KS3CKC")
+    }
 }
