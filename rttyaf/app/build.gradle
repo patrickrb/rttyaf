@@ -24,12 +24,12 @@ static def getCurrentTime() {
 
 android {
 
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "radio.ks3ckc.rttyaf"
         minSdk 23
-        targetSdk 35
+        targetSdk 36
         // Required for the androidTest suite to actually run: our instrumented
         // tests use @RunWith(AndroidJUnit4::class). Without this, AGP falls back
         // to the legacy android.test.InstrumentationTestRunner, which discovers
@@ -52,7 +52,7 @@ android {
         // again (resetting the counter), bump this offset past the last
         // published versionCode once more.
         def ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")
-        versionCode ciRunNumber ? (ciRunNumber.toInteger() + 1000) : 5
+        versionCode ciRunNumber ? (ciRunNumber.toInteger() + 1000) : 6
         // CI passes -PVERSION_NAME_OVERRIDE derived from the git tag (v1.1.0 ->
         // "1.1.0", dev-42 -> "1.1.0-dev.42"). Local builds use the fallback.
         def ciVersionName = project.findProperty('VERSION_NAME_OVERRIDE')
