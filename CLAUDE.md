@@ -33,13 +33,13 @@ often can't reach idle because the UI animates continuously).
 
 ## Workflow
 
-**Every work item requires a pull request — no direct commits to `dev` or
-`main`.** Even a one-line docs or config change goes through a feature branch and
-a PR.
+**Every work item requires a pull request — no direct commits to `main`.**
+Even a one-line docs or config change goes through a feature branch and a PR.
 
-**All PRs target the `dev` branch.** After finishing the code for any work item,
-open a pull request against `dev` (do the work on a feature branch, then
-`gh pr create --base dev`). Don't merge straight to `main`.
+**All PRs target `main`.** RTTYAF develops straight to `main` (there is no
+`dev`/`staging` promotion chain — that was FT8AF's release discipline and its
+gates were removed). Do the work on a feature branch, then
+`gh pr create --base main`.
 
 **Use a git worktree for every separate line of work.** Don't switch branches in
 your primary checkout — branch-switching there collides with anything else in
@@ -52,8 +52,10 @@ git worktree add ../<checkout-dir-name>-<short-task-name> -b feat/<task>
 
 Notes for a fresh worktree:
 
-- The `ft8af/app/src/main/cpp/` native sources (`ft8_lib`, `ft8af_glue`) are
-  **tracked** in git, so a fresh worktree builds with no manual copying.
+- RTTYAF is a pure-Kotlin/JVM app: the RTTY modem lives in
+  `rttyaf/app/src/main/kotlin/radio/ks3ckc/ft8af/rtty/` and there are **no
+  native (`cpp/`) sources** to copy — a fresh worktree builds as-is. (The
+  FT8AF `ft8_lib`/`ft8af_glue` native tree was removed in the fork.)
 - Build/install from inside the worktree's `ft8af` dir: Windows uses the wrapper
   (`cmd.exe /c "gradlew.bat installDebug"`); macOS uses `./gradlew` (see Build &
   Deploy for the JDK 17 requirement). Both can install to an attached device.
