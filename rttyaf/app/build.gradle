@@ -52,7 +52,7 @@ android {
         // again (resetting the counter), bump this offset past the last
         // published versionCode once more.
         def ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")
-        versionCode ciRunNumber ? (ciRunNumber.toInteger() + 1000) : 10
+        versionCode ciRunNumber ? (ciRunNumber.toInteger() + 1000) : 11
         // CI passes -PVERSION_NAME_OVERRIDE derived from the git tag (v1.1.0 ->
         // "1.1.0", dev-42 -> "1.1.0-dev.42"). Local builds use the fallback.
         def ciVersionName = project.findProperty('VERSION_NAME_OVERRIDE')
