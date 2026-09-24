@@ -334,7 +334,7 @@ public class ShareLogs {
                 if (!isCancel) {
                     Intent sharingIntent = new Intent(Intent.ACTION_SEND);
                     Uri fileUri = FileProvider.getUriForFile(context.getApplicationContext()
-                            , "radio.ks3ckc.ft8af.fileprovider", file);
+                            , context.getApplicationContext().getPackageName() + ".fileprovider", file);
                     sharingIntent.setType("application/octet-stream");
                     sharingIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
                     sharingIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
