@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.k1af.ft8af.GeneralVariables
 import com.k1af.ft8af.R
-import radio.ks3ckc.ft8af.theme.Accent
+import radio.ks3ckc.ft8af.theme.BrandMark
 import radio.ks3ckc.ft8af.theme.GeistMonoFamily
 import radio.ks3ckc.ft8af.theme.Signal
 import radio.ks3ckc.ft8af.theme.TextPrimary
@@ -93,7 +93,7 @@ fun FT8AFSplashScreen(
                 )
             )
     ) {
-        // Range rings + compass marks + amber halo backdrop.
+        // Range rings + compass marks + violet halo backdrop.
         SplashBackdrop(modifier = Modifier.fillMaxSize())
 
         Column(
@@ -146,7 +146,7 @@ fun FT8AFSplashScreen(
                         .clip(CircleShape)
                         .background(Signal.copy(alpha = blinkPhase)),
                 )
-                LoadingDots(label = stringResource(R.string.splash_initializing), color = Accent.copy(alpha = 0.85f))
+                LoadingDots(label = stringResource(R.string.splash_initializing), color = BrandMark.copy(alpha = 0.85f))
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -162,7 +162,7 @@ fun FT8AFSplashScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "ft8af.app",
+                text = "rttyaf.app",
                 color = Color(0xFF8A96B1).copy(alpha = 0.45f),
                 fontSize = 10.sp,
                 fontFamily = GeistMonoFamily,
@@ -180,13 +180,13 @@ private fun SplashBackdrop(modifier: Modifier = Modifier) {
         val centerX = size.width / 2f
         val centerY = size.height * 0.38f
 
-        // Amber center halo.
+        // Violet center halo.
         val haloRadius = size.minDimension * 0.4f
         drawCircle(
             brush = Brush.radialGradient(
-                0f to Color(0xFFFFAF5E).copy(alpha = 0.18f),
-                0.6f to Color(0xFFFFAF5E).copy(alpha = 0.04f),
-                1f to Color(0xFFFFAF5E).copy(alpha = 0f),
+                0f to Color(0xFFA78BFA).copy(alpha = 0.18f),
+                0.6f to Color(0xFFA78BFA).copy(alpha = 0.04f),
+                1f to Color(0xFFA78BFA).copy(alpha = 0f),
                 center = Offset(centerX, centerY),
                 radius = haloRadius,
             ),
@@ -212,7 +212,7 @@ private fun SplashBackdrop(modifier: Modifier = Modifier) {
         // Compass NSEW marks at radius 175 from a slightly lower center (matches splash.jsx).
         val compassCenterY = centerY + size.height * 0.08f
         val compassRadius = 175f
-        val compassColor = Color(0xFFFFAF5E).copy(alpha = 0.45f)
+        val compassColor = Color(0xFFA78BFA).copy(alpha = 0.45f)
         listOf("N", "E", "S", "W").forEachIndexed { i, _ ->
             val theta = (i * 90 - 90) * PI.toFloat() / 180f
             val x = centerX + cos(theta) * compassRadius
@@ -236,7 +236,7 @@ private fun PulseAura(phase: Float, modifier: Modifier = Modifier) {
             val r = baseR * (1f + p * 0.8f)
             val alpha = (1f - p) * 0.55f
             drawCircle(
-                color = Accent.copy(alpha = alpha),
+                color = BrandMark.copy(alpha = alpha),
                 radius = r,
                 center = center,
                 style = Stroke(width = 1.dp.toPx()),
