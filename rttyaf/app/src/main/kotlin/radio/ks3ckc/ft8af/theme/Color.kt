@@ -143,6 +143,14 @@ val SignalSoft: Color get() = activePalette.signalSoft
 // Theme-independent saturated hues (shared by every theme).
 // ---------------------------------------------------------------------------
 
+// RTTYAF brand — the mark/space two-tone used by the launcher icon and the
+// splash wordmark. Violet = MARK tone, fuchsia = SPACE tone (an FSK nod).
+// Kept as plain constants (like the Status/Band hues) so brand surfaces stay
+// violet regardless of the switchable amber/cyan app accent.
+val BrandMark = Color(0xFFA78BFA)      // violet
+val BrandMarkGlow = Color(0xFFD7C9FF)  // light violet highlight
+val BrandSpace = Color(0xFFF472B6)     // fuchsia
+
 // Target — the station the operator is currently calling. Pink/magenta so it's
 // visually distinct from CQ (amber) and TO YOU (cyan); these often stack on a
 // single row during an active QSO.

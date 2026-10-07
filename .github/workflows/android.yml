@@ -1,52 +1,49 @@
 name: Android CI & Release
 
-# Android pipeline for the ft8af/ app: unit tests + coverage, instrumented
+# Android pipeline for the rttyaf/ app: unit tests + coverage, instrumented
 # emulator tests, static analysis (lint/detekt/ktlint), and the signed
-# APK/AAB build + GitHub Release + Play publish (internal track on staging,
-# production track on main / android-v* tags — see the Release lifecycle below).
+# APK/AAB build + GitHub Release + Play publish (internal track on main,
+# production track on android-v* tags — see the Release lifecycle below).
 #
 # Release lifecycle (see docs/release-pipeline.md):
-#   PR to dev/staging/main -> build-only (unsigned), tests
-#   push to dev            -> build-only sanity, NO release (dev builds never
-#                             reach the Releases page)
-#   push to staging        -> android-dev.<run#> PRERELEASE + Play internal
-#   push to main           -> android-v<auto-bump> release + Play production
-#   android-v* tag push    -> release + Play production
-# Feature work lands on dev; the dev build is cut only when dev -> staging
-# merges, and production only when staging -> main merges.
+#   PR to main          -> build-only (unsigned), tests
+#   push to main        -> android-dev.<run#> PRERELEASE + Play INTERNAL track
+#   android-v* tag push -> release + Play PRODUCTION track
+# RTTYAF develops straight to main (no dev/staging promotion chain — that was
+# FT8AF's model). Merging a feature PR cuts an internal-track build for
+# testers; production is a deliberate act: push an android-v* tag.
 #
-# PATH-FILTERED: on pull requests and dev pushes this whole pipeline only runs
-# when Android-relevant files change (ft8af/** — which includes the shared
-# native C core at ft8af/app/src/main/cpp/ — or this workflow file). Pushes to
-# staging/main and android-v* tags always build (a full release snapshot,
-# regardless of what changed). The always-run `android-gate` job is the single
-# required status check so branch protection never gets stuck "pending" when the
-# build jobs are path-skipped.
+# PATH-FILTERED: on pull requests this whole pipeline only runs when
+# Android-relevant files change (rttyaf/** — which includes the native FT8/RTTY
+# DSP core at rttyaf/app/src/main/cpp/ — or this workflow file). Pushes to main
+# and android-v* tags always build (a full release snapshot, regardless of what
+# changed). The always-run `android-gate` job is the single required status
+# check so branch protection never gets stuck "pending" when the build jobs are
+# path-skipped.
 
 on:
   push:
-    branches: [main, staging, dev]
+    branches: [main]
     tags:
       - 'android-v*'
   pull_request:
-    branches: [main, staging, dev]
+    branches: [main]
 
 permissions:
   contents: write
 
 # Google Play allows only one active "edit" per app, so two release builds
 # publishing at once make the second fail with "This edit has expired, please
-# create a new Edit." Serialize the release-publishing runs (pushes to
-# staging/main and android-v* tags) into a single queue so they never overlap on
-# the Play API. cancel-in-progress is false so an in-flight publish finishes
-# rather than being killed mid-upload. Other runs (PRs, dev pushes) get a unique
-# group keyed to run id, so they never queue and CI stays fast.
+# create a new Edit." Serialize the release-publishing runs (pushes to main and
+# android-v* tags) into a single queue so they never overlap on the Play API.
+# cancel-in-progress is false so an in-flight publish finishes rather than
+# being killed mid-upload. Other runs (PRs) get a unique group keyed to run id,
+# so they never queue and CI stays fast.
 concurrency:
   group: >-
     ${{
       (github.event_name == 'push'
         && (github.ref == 'refs/heads/main'
-          || github.ref == 'refs/heads/staging'
           || startsWith(github.ref, 'refs/tags/android-v')))
       && 'play-publish'
       || format('build-{0}', github.run_id)
@@ -69,7 +66,7 @@ jobs:
         with:
           filters: |
             android:
-              - 'ft8af/**'
+              - 'rttyaf/**'
               - '.github/workflows/android.yml'
 
       - name: Decide whether to run
@@ -78,10 +75,10 @@ jobs:
           CHANGED: ${{ steps.filter.outputs.android }}
         run: |
           set -euo pipefail
-          # staging/main pushes and android-v* tags always build the full
-          # release snapshot; otherwise (dev push, PRs) build only when
-          # Android-relevant files changed.
-          if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF" == "refs/heads/main" || "$GITHUB_REF" == "refs/heads/staging" || "$GITHUB_REF" == refs/tags/android-v* ) ]]; then
+          # main pushes and android-v* tags always build the full release
+          # snapshot; otherwise (PRs) build only when Android-relevant files
+          # changed.
+          if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF" == "refs/heads/main" || "$GITHUB_REF" == refs/tags/android-v* ) ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           elif [[ "$CHANGED" == "true" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -92,7 +89,7 @@ jobs:
   test:
     name: Unit tests & coverage
     needs: detect
-    if: ${{ needs.detect.outputs.run == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'))) }}
+    if: ${{ needs.detect.outputs.run == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -111,12 +108,12 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('ft8af/**/*.gradle*', 'ft8af/gradle/wrapper/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('rttyaf/**/*.gradle*', 'rttyaf/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 
       - name: Grant execute permission for gradlew
-        run: chmod +x ft8af/gradlew
+        run: chmod +x rttyaf/gradlew
 
       - name: Pre-install NDK (retry around flaky SDK downloads)
         run: |
@@ -140,11 +137,11 @@ jobs:
           exit 1
 
       - name: Run unit tests
-        working-directory: ft8af
+        working-directory: rttyaf
         run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Generate coverage report
-        working-directory: ft8af
+        working-directory: rttyaf
         run: ./gradlew jacocoTestReport --stacktrace
 
       - name: Upload coverage to Codecov
@@ -153,7 +150,7 @@ jobs:
         uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ft8af/app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
+          files: rttyaf/app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
           # Tag this upload so Codecov reports the Android JVM suite as its own
           # component instead of merging it into one undifferentiated total.
           flags: android
@@ -164,9 +161,9 @@ jobs:
         with:
           name: unit-test-reports
           path: |
-            ft8af/app/build/reports/tests/
-            ft8af/app/build/test-results/
-            ft8af/app/build/reports/jacoco/
+            rttyaf/app/build/reports/tests/
+            rttyaf/app/build/test-results/
+            rttyaf/app/build/reports/jacoco/
 
   instrumented:
     name: Instrumented tests (emulator)
@@ -177,7 +174,7 @@ jobs:
     # checks while it stabilises (issue #60) — a flaky emulator must never block
     # a release.
     needs: detect
-    if: ${{ needs.detect.outputs.run == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'))) }}
+    if: ${{ needs.detect.outputs.run == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -196,12 +193,12 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('ft8af/**/*.gradle*', 'ft8af/gradle/wrapper/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('rttyaf/**/*.gradle*', 'rttyaf/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 
       - name: Grant execute permission for gradlew
-        run: chmod +x ft8af/gradlew
+        run: chmod +x rttyaf/gradlew
 
       # Hardware acceleration (KVM) is required for a usable x86_64 emulator on
       # the GitHub-hosted Ubuntu runners; without it the AVD falls back to slow
@@ -219,7 +216,7 @@ jobs:
       # 429 is retried cheaply instead of wasting a full emulator boot; the
       # emulator step then runs against already-cached dependencies.
       - name: Assemble instrumented test APKs
-        working-directory: ft8af
+        working-directory: rttyaf
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do
@@ -242,7 +239,7 @@ jobs:
           arch: x86_64
           target: google_apis
           profile: Nexus 6
-          working-directory: ft8af
+          working-directory: rttyaf
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           # Stream test progress into the job log. By default
@@ -270,8 +267,8 @@ jobs:
         with:
           name: instrumented-test-reports
           path: |
-            ft8af/app/build/reports/androidTests/
-            ft8af/app/build/outputs/androidTest-results/
+            rttyaf/app/build/reports/androidTests/
+            rttyaf/app/build/outputs/androidTest-results/
 
   static-analysis:
     name: lint / detekt / ktlint
@@ -307,31 +304,31 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('ft8af/**/*.gradle*', 'ft8af/gradle/wrapper/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('rttyaf/**/*.gradle*', 'rttyaf/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 
       - name: Grant execute permission for gradlew
-        run: chmod +x ft8af/gradlew
+        run: chmod +x rttyaf/gradlew
 
       # --- WARN-ONLY during rollout: remove continue-on-error to make blocking ---
 
       - name: Android lint (debug)
         id: lint
         continue-on-error: true
-        working-directory: ft8af
+        working-directory: rttyaf
         run: ./gradlew lintDebug --stacktrace
 
       - name: detekt
         id: detekt
         continue-on-error: true
-        working-directory: ft8af
+        working-directory: rttyaf
         run: ./gradlew detekt --stacktrace
 
       - name: ktlint
         id: ktlint
         continue-on-error: true
-        working-directory: ft8af
+        working-directory: rttyaf
         run: ./gradlew ktlintCheck --stacktrace
 
       - name: Upload analysis reports
@@ -340,18 +337,17 @@ jobs:
         with:
           name: static-analysis-reports
           path: |
-            ft8af/app/build/reports/lint-results-debug.html
-            ft8af/app/build/reports/lint-results-debug.xml
-            ft8af/app/build/reports/detekt/
-            ft8af/app/build/reports/ktlint/
+            rttyaf/app/build/reports/lint-results-debug.html
+            rttyaf/app/build/reports/lint-results-debug.xml
+            rttyaf/app/build/reports/detekt/
+            rttyaf/app/build/reports/ktlint/
           if-no-files-found: ignore
 
   build:
     name: Build APK
     needs: [detect, test]
-    # Run when Android is in scope (detect.run) AND tests passed (PR / staging /
-    # main push) or were skipped (dev push, tags). Block only on actual test
-    # failure/cancel.
+    # Run when Android is in scope (detect.run) AND tests passed (PR / main
+    # push) or were skipped (tags). Block only on actual test failure/cancel.
     if: ${{ always() && needs.detect.outputs.run == 'true' && needs.test.result != 'failure' && needs.test.result != 'cancelled' }}
     runs-on: ubuntu-latest
 
@@ -368,15 +364,15 @@ jobs:
         id: tag
         run: |
           set -euo pipefail
-          # Release lanes (everything else — dev push, PRs — is build-only):
-          #   android-v* tag push -> production release, Play production
-          #   push to main        -> auto-bumped android-v* tag, Play production
-          #   push to staging     -> android-dev.<run#> tag, PRERELEASE, Play internal
-          # The dev build is cut on staging, NOT on dev: dev pushes never reach
-          # this release path. The android- prefix keeps these tags separate from
-          # the desktop-v* lane on the Releases page (issue: per-platform tags).
-          # Bumps seed from a legacy bare v* tag when no android-v* exists yet so
-          # the version sequence stays continuous with pre-split releases.
+          # Release lanes (everything else — PRs — is build-only):
+          #   android-v* tag push -> production release, Play PRODUCTION track
+          #   push to main        -> android-dev.<run#> tag, PRERELEASE,
+          #                          Play INTERNAL track
+          # RTTYAF has no dev/staging chain: a feature-PR merge into main is the
+          # internal-testing build (what dev -> staging was in FT8AF), and
+          # production is cut only by deliberately pushing an android-v* tag.
+          # The android- prefix keeps these tags separate from the desktop-v*
+          # lane on the Releases page.
           if [[ "${GITHUB_REF}" == refs/tags/android-v* ]]; then
             echo "release_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "version_name=${GITHUB_REF_NAME#android-v}" >> "$GITHUB_OUTPUT"
@@ -384,51 +380,29 @@ jobs:
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "play_track=production" >> "$GITHUB_OUTPUT"
           elif [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            # Auto-bump the last component from the latest android-v* tag (or a
-            # legacy v* tag for continuity), e.g. android-v1.2 -> android-v1.3.
-            latest=$(git tag --list 'android-v*' --sort=-v:refname | head -n1)
-            base="${latest#android-v}"
-            if [[ -z "$base" ]]; then
-              legacy=$(git tag --list 'v*' --sort=-v:refname | head -n1)
-              base="${legacy#v}"
-            fi
-            if [[ -z "$base" ]]; then
-              new_ver="0.1"
-            else
-              IFS='.' read -ra parts <<< "$base"
-              last_idx=$((${#parts[@]} - 1))
-              parts[$last_idx]=$((parts[$last_idx] + 1))
-              new_ver="$(IFS=.; echo "${parts[*]}")"
-            fi
-            new_tag="android-v$new_ver"
-            echo "Latest android tag: ${latest:-<none>} -> new tag: $new_tag"
-            echo "release_tag=$new_tag" >> "$GITHUB_OUTPUT"
-            echo "version_name=$new_ver" >> "$GITHUB_OUTPUT"
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-            echo "play_track=production" >> "$GITHUB_OUTPUT"
-          elif [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/staging" ]]; then
-            # staging pushes (a dev -> staging merge) cut a run-numbered
-            # PRERELEASE, published to the Play internal track. Distinct prefix so
-            # it sorts separately from android-v* and so the Play releaseName
+            # main pushes (a feature-PR merge) cut a run-numbered PRERELEASE,
+            # published to the Play internal track. Distinct prefix so it sorts
+            # separately from android-v* and so the Play releaseName
             # disambiguates it from production candidates.
             new_tag="android-dev.${GITHUB_RUN_NUMBER}"
-            # Derive the base semver from the latest android-v* (or legacy v*) so
-            # the APK reads e.g. "1.1.0-dev.42" instead of a bare run number.
+            # Derive the base semver from the latest android-v* (or legacy v*)
+            # tag so the APK reads e.g. "1.1.0-dev.42" instead of a bare run
+            # number. Until the first android-v* tag exists, fall back to the
+            # static versionName in rttyaf/app/build.gradle (keep in sync).
             latest=$(git tag --list 'android-v*' --sort=-v:refname | head -n1)
             base_ver="${latest#android-v}"
             if [[ -z "$base_ver" ]]; then
               legacy=$(git tag --list 'v*' --sort=-v:refname | head -n1)
               base_ver="${legacy#v}"
             fi
-            base_ver="${base_ver:-0.0.0}"
+            base_ver="${base_ver:-1.1.0}"
             echo "release_tag=$new_tag" >> "$GITHUB_OUTPUT"
             echo "version_name=${base_ver}-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
             echo "should_release=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
             echo "play_track=internal" >> "$GITHUB_OUTPUT"
           else
-            # dev push, PR, or other branch — build only, no release
+            # PR or other branch — build only, no release
             echo "release_tag=" >> "$GITHUB_OUTPUT"
             echo "version_name=" >> "$GITHUB_OUTPUT"
             echo "should_release=false" >> "$GITHUB_OUTPUT"
@@ -448,12 +422,12 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('ft8af/**/*.gradle*', 'ft8af/gradle/wrapper/gradle-wrapper.properties') }}
+          key: gradle-${{ runner.os }}-${{ hashFiles('rttyaf/**/*.gradle*', 'rttyaf/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-
 
       - name: Grant execute permission for gradlew
-        run: chmod +x ft8af/gradlew
+        run: chmod +x rttyaf/gradlew
 
       - name: Pre-install NDK (retry around flaky SDK downloads)
         run: |
@@ -498,7 +472,7 @@ jobs:
           echo "RELEASE_STORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Build APK & AAB
-        working-directory: ft8af
+        working-directory: rttyaf
         env:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -528,7 +502,7 @@ jobs:
         if: steps.tag.outputs.should_release == 'true'
         run: |
           set -euo pipefail
-          cd ft8af/app/build/outputs/apk/release
+          cd rttyaf/app/build/outputs/apk/release
           # Signed builds emit app-release.apk; unsigned emit app-release-unsigned.apk.
           # Keep the fallback so the rename works either way.
           if [[ -f app-release.apk ]]; then
@@ -540,20 +514,20 @@ jobs:
             ls -la >&2
             exit 1
           fi
-          mv "$src" "FT8AF-${{ steps.tag.outputs.release_tag }}.apk"
+          mv "$src" "RTTYAF-${{ steps.tag.outputs.release_tag }}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ft8af-release
-          path: ft8af/app/build/outputs/apk/release/*.apk
+          name: rttyaf-release
+          path: rttyaf/app/build/outputs/apk/release/*.apk
 
       - name: Upload AAB artifact
         if: steps.tag.outputs.should_release == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: ft8af-release-aab
-          path: ft8af/app/build/outputs/bundle/release/*.aab
+          name: rttyaf-release-aab
+          path: rttyaf/app/build/outputs/bundle/release/*.aab
 
       # R8 mapping for the bundle. Kept as an artifact so a given release's
       # deobfuscation file is recoverable independently of Play Console.
@@ -561,8 +535,8 @@ jobs:
         if: steps.tag.outputs.should_release == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: ft8af-release-mapping
-          path: ft8af/app/build/outputs/mapping/release/mapping.txt
+          name: rttyaf-release-mapping
+          path: rttyaf/app/build/outputs/mapping/release/mapping.txt
 
       - name: Create GitHub Release
         if: steps.tag.outputs.should_release == 'true'
@@ -570,13 +544,12 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.release_tag }}
           name: ${{ steps.tag.outputs.release_tag }}
-          # Without this, a not-yet-existing tag (the android-dev.* / auto-bumped
-          # android-v* lanes) is created by the release API from the repo's
-          # DEFAULT branch (main), not the commit that was built — so staging
-          # releases got tagged on main's HEAD and sorted under its old date on
-          # the Releases page.
+          # Without this, a not-yet-existing tag (the android-dev.* lane) is
+          # created by the release API from the repo's DEFAULT branch (main),
+          # not the commit that was built — so releases could get tagged on
+          # main's HEAD and sort under its old date on the Releases page.
           target_commitish: ${{ github.sha }}
-          files: ft8af/app/build/outputs/apk/release/FT8AF-*.apk
+          files: rttyaf/app/build/outputs/apk/release/RTTYAF-*.apk
           generate_release_notes: true
           # android-dev.* releases are flagged as prerelease so they sort under
           # the latest android-v* and don't get picked up by downstream tooling
@@ -592,14 +565,14 @@ jobs:
 
       # Publishing to Play is a best-effort DEPLOY side-effect, not a build
       # signal — by this point the signed APK/AAB is already built and the
-      # GitHub Release is published. The Play Internal upload can still fail on
-      # external Play Console track state outside CI's control (e.g. "You cannot
+      # GitHub Release is published. The Play upload can still fail on external
+      # Play Console track state outside CI's control (e.g. "You cannot
       # rollout this release because it does not allow any existing users to
       # upgrade to the newly added APKs", or an expired edit when two releases
       # race). Those must NOT turn the build job red and block android-gate /
-      # the dev→main PR. So continue-on-error here (mirroring the Codecov upload
-      # above) and surface a warning in the next step instead. A genuinely
-      # broken build fails earlier, in "Build APK & AAB".
+      # the feature-PR merge. So continue-on-error here (mirroring the Codecov
+      # upload above) and surface a warning in the next step instead. A
+      # genuinely broken build fails earlier, in "Build APK & AAB".
       - name: Publish AAB to Play
         id: play_publish
         if: steps.tag.outputs.should_release == 'true'
@@ -607,12 +580,12 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: radio.ks3ckc.ft8af
-          releaseFiles: ft8af/app/build/outputs/bundle/release/app-release.aab
+          packageName: radio.ks3ckc.rttyaf
+          releaseFiles: rttyaf/app/build/outputs/bundle/release/app-release.aab
           # R8 deobfuscation mapping — clears the Play Console "no deobfuscation
           # file" warning and makes crash/ANR stack traces readable.
-          mappingFile: ft8af/app/build/outputs/mapping/release/mapping.txt
-          # staging -> internal track; main / android-v* tag -> production track.
+          mappingFile: rttyaf/app/build/outputs/mapping/release/mapping.txt
+          # main -> internal track; android-v* tag -> production track.
           track: ${{ steps.tag.outputs.play_track }}
           status: completed
           releaseName: ${{ steps.tag.outputs.release_tag }}

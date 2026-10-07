@@ -227,7 +227,7 @@ private fun buildLogLines(debugLogFile: File?, captureLogcat: Boolean): List<Str
 private fun shareDebugLog(context: android.content.Context, debugLogFile: File) {
     if (!debugLogFile.exists()) return
     val uri = FileProvider.getUriForFile(
-        context, "radio.ks3ckc.ft8af.fileprovider", debugLogFile,
+        context, "${context.packageName}.fileprovider", debugLogFile,
     )
     val send = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"

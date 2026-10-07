@@ -159,7 +159,7 @@ private fun sendBugReportEmail(context: Context, description: String) {
         putExtra(Intent.EXTRA_TEXT, buildBugReportBody(description, info))
         if (logFile != null && logFile.exists()) {
             val uri = FileProvider.getUriForFile(
-                context, "radio.ks3ckc.ft8af.fileprovider", logFile,
+                context, "${context.packageName}.fileprovider", logFile,
             )
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

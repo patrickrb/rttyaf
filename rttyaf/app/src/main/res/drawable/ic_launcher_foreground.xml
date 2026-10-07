@@ -6,61 +6,71 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Range rings (faint blue-grey, within safe zone). -->
+    <!-- Range rings (faint violet-grey, within the 66dp safe zone). -->
     <path android:pathData="M54,57 m-30,0 a30,30 0 1,0 60,0 a30,30 0 1,0 -60,0"
         android:fillColor="#00000000"
-        android:strokeColor="#33A0B6DC"
+        android:strokeColor="#33ADA6DC"
         android:strokeWidth="0.6" />
     <path android:pathData="M54,57 m-21,0 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0"
         android:fillColor="#00000000"
-        android:strokeColor="#33A0B6DC"
+        android:strokeColor="#33ADA6DC"
         android:strokeWidth="0.6" />
 
-    <!-- Top-half signal arcs (outer to inner, amber, increasing opacity). -->
+    <!-- Top-half signal arcs (violet, outer to inner, increasing opacity). -->
     <path android:pathData="M22,57 A32,32 0 0,1 86,57"
         android:fillColor="#00000000"
-        android:strokeColor="#55FFAF5E"
+        android:strokeColor="#55A78BFA"
         android:strokeWidth="2.2"
         android:strokeLineCap="round" />
     <path android:pathData="M30,57 A24,24 0 0,1 78,57"
         android:fillColor="#00000000"
-        android:strokeColor="#99FFAF5E"
+        android:strokeColor="#99A78BFA"
         android:strokeWidth="2.8"
         android:strokeLineCap="round" />
     <path android:pathData="M38,57 A16,16 0 0,1 70,57"
         android:fillColor="#00000000"
-        android:strokeColor="#FFFFC880"
+        android:strokeColor="#FFD7C9FF"
         android:strokeWidth="3.2"
         android:strokeLineCap="round" />
 
-    <!-- Center disc (the operator QTH) — amber beam gradient. -->
-    <path android:pathData="M54,57 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0">
-        <aapt:attr name="android:fillColor">
+    <!-- RTTY mark/space two-tone motif: two rounded FSK bars.
+         Drawn as round-capped vertical strokes so the ends are pill-shaped. -->
+    <!-- MARK bar (violet). -->
+    <path android:pathData="M50.5,47 L50.5,67"
+        android:strokeWidth="6"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
             <gradient android:type="linear"
-                android:startX="54" android:startY="50"
-                android:endX="54" android:endY="64">
-                <item android:offset="0" android:color="#FFFFD7A0" />
-                <item android:offset="0.5" android:color="#FFFFAF5E" />
-                <item android:offset="1" android:color="#FFFF8A2C" />
+                android:startX="50.5" android:startY="46"
+                android:endX="50.5" android:endY="68">
+                <item android:offset="0" android:color="#FFD7C9FF" />
+                <item android:offset="0.5" android:color="#FFA78BFA" />
+                <item android:offset="1" android:color="#FF7C5CFF" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Center disc rim. -->
-    <path android:pathData="M54,57 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0"
-        android:fillColor="#00000000"
-        android:strokeColor="#99FFE6BE"
-        android:strokeWidth="0.4" />
-    <!-- Top-left specular highlight on the disc. -->
-    <path android:pathData="M52,54.5 m-2.4,0 a2.4,1.6 0 1,0 4.8,0 a2.4,1.6 0 1,0 -4.8,0"
-        android:fillColor="#A0FFF5DC" />
+    <!-- SPACE bar (fuchsia). -->
+    <path android:pathData="M57.5,47 L57.5,67"
+        android:strokeWidth="6"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear"
+                android:startX="57.5" android:startY="46"
+                android:endX="57.5" android:endY="68">
+                <item android:offset="0" android:color="#FFFFC4E4" />
+                <item android:offset="0.5" android:color="#FFF472B6" />
+                <item android:offset="1" android:color="#FFD64F97" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
     <!-- Tiny signal sparks along the outer arc edges. -->
     <path android:pathData="M22,57 m-0.6,0 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0"
-        android:fillColor="#80FFD7A0" />
+        android:fillColor="#80D7C9FF" />
     <path android:pathData="M86,57 m-0.6,0 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0"
-        android:fillColor="#80FFD7A0" />
+        android:fillColor="#80D7C9FF" />
     <path android:pathData="M30,57 m-0.6,0 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0"
-        android:fillColor="#80FFD7A0" />
+        android:fillColor="#80FFC4E4" />
     <path android:pathData="M78,57 m-0.6,0 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0"
-        android:fillColor="#80FFD7A0" />
+        android:fillColor="#80FFC4E4" />
 </vector>

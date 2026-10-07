@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,6 +31,7 @@ import radio.ks3ckc.ft8af.theme.Accent
 import radio.ks3ckc.ft8af.theme.Band20m
 import radio.ks3ckc.ft8af.theme.BgApp
 import radio.ks3ckc.ft8af.theme.BgSurface
+import radio.ks3ckc.ft8af.theme.BgSurface2
 import radio.ks3ckc.ft8af.theme.Border
 import radio.ks3ckc.ft8af.theme.GeistMonoFamily
 import radio.ks3ckc.ft8af.theme.Signal
@@ -71,7 +75,8 @@ fun LogScreen(state: RttyAppState) {
                                 Text(e.call, color = Signal, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = GeistMonoFamily)
                                 Text("${e.band} · RTTY", color = TextMuted, fontSize = 12.sp, fontFamily = GeistMonoFamily)
                             }
-                            Text("${e.timeUtc}z · S ${e.rstSent} · R ${e.rstRcvd}", color = TextMuted, fontSize = 12.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(top = 3.dp))
+                            val exch = if (e.exchRcvd.isNotBlank()) " · ${e.exchRcvd}" else ""
+                            Text("${e.timeUtc}z · S ${e.rstSent} · R ${e.rstRcvd}$exch", color = TextMuted, fontSize = 12.sp, fontFamily = GeistMonoFamily, modifier = Modifier.padding(top = 3.dp))
                         }
                         val c = if (e.synced) StatusConfirmed else StatusWarn
                         Row(
@@ -118,6 +123,10 @@ fun MacrosScreen(state: RttyAppState) {
 // ---------------- CONTEST (placeholder) ----------------
 @Composable
 fun ContestScreen(state: RttyAppState) {
+    // Multipliers = distinct received exchanges (now that Operate logs them).
+    val mults = state.log.mapNotNull { it.exchRcvd.ifBlank { null } }.distinct().size
+    val points = state.log.size
+    val score = points * maxOf(1, mults)
     Column(Modifier.fillMaxSize().background(BgApp)) {
         ScreenTitle("Contest", "Casual · score, mults and Cabrillo export")
         Row(
@@ -126,9 +135,34 @@ fun ContestScreen(state: RttyAppState) {
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             ScoreTile("${state.log.size}", "QSOs", Accent)
-            ScoreTile("0", "Mults", Signal)
-            ScoreTile("${state.log.size}", "Points", Color(0xFFC084FC))
-            ScoreTile("${state.log.size}", "Score", StatusConfirmed)
+            ScoreTile("$mults", "Mults", Signal)
+            ScoreTile("$points", "Points", Color(0xFFC084FC))
+            ScoreTile("$score", "Score", StatusConfirmed)
+        }
+        // My exchange (sent as {EXCH} in macros). Edited here, not on Operate,
+        // so typing a worked station's exchange never overwrites our own.
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(12.dp)).background(BgSurface)
+                .border(1.dp, Border, RoundedCornerShape(12.dp)).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column {
+                Text("My exchange", color = TextPrimary, fontSize = 14.sp)
+                Text("Sent with every {EXCH} macro", color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            }
+            Box(
+                Modifier.width(120.dp).clip(RoundedCornerShape(8.dp)).background(BgSurface2)
+                    .border(1.dp, Border, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                BasicTextField(
+                    value = state.myExchange,
+                    onValueChange = { state.myExchange = it.uppercase() },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Accent, fontSize = 15.sp, fontWeight = FontWeight.Bold, fontFamily = GeistMonoFamily),
+                    cursorBrush = SolidColor(Accent),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Contest picker, serials & Cabrillo — coming next.", color = TextFaint, fontSize = 13.sp)

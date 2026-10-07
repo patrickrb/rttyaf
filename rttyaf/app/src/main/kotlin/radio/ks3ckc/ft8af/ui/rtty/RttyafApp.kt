@@ -31,6 +31,12 @@ data class RttyLogEntry(
     val timeUtc: String,
     val rstSent: String,
     val rstRcvd: String,
+    /** Exchange we sent (our grid/zone/serial). */
+    val exchSent: String = "",
+    /** Exchange we received from the worked station — needed for contest mults. */
+    val exchRcvd: String = "",
+    /** Our running serial number at the time of the QSO. */
+    val serial: Int = 0,
     val synced: Boolean = false,
 )
 
@@ -47,8 +53,10 @@ class RttyAppState(val engine: RttyEngine) {
     var rstSent by mutableStateOf("599")
     var rstRcvd by mutableStateOf("599")
     var serial by mutableStateOf(1)
+    /** Our own exchange sent in {EXCH} macros (grid/zone/etc.); edited on Contest. */
     var myExchange by mutableStateOf("FN20")
-    var txActive by mutableStateOf(false)
+    /** The worked station's exchange, typed on Operate and stored with the QSO. */
+    var rcvdExchange by mutableStateOf("")
     var txPreview by mutableStateOf("")
 
     val macros = mutableStateListOf(

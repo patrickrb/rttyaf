@@ -2,7 +2,7 @@ name: Discord — merge notify
 
 on:
   push:
-    branches: [dev, staging, main]
+    branches: [main]
 
 jobs:
   notify:
@@ -26,16 +26,10 @@ jobs:
             echo "::error::DISCORD_WEBHOOK_URL secret is not set"
             exit 1
           fi
-          if [[ "$BRANCH" == "main" ]]; then
-            color=3066993   # green — production release
-            emoji="🚀"
-          elif [[ "$BRANCH" == "staging" ]]; then
-            color=3447003   # blue — dev (prerelease) build cut
-            emoji="📦"
-          else
-            color=15105570  # orange — landed on dev
-            emoji="🔧"
-          fi
+          # RTTYAF develops straight to main: a main merge cuts the
+          # internal-track (prerelease) build, not production.
+          color=3447003   # blue — internal (prerelease) build cut
+          emoji="📦"
           sha_short="${SHA:0:7}"
           first_line=$(printf '%s' "$COMMIT_MSG" | head -n1)
           body=$(printf '%s' "$COMMIT_MSG" | tail -n +2 | sed -E '/^[[:space:]]*$/d' || true)

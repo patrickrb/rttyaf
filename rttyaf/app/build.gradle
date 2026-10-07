@@ -24,12 +24,12 @@ static def getCurrentTime() {
 
 android {
 
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "radio.ks3ckc.rttyaf"
         minSdk 23
-        targetSdk 35
+        targetSdk 36
         // Required for the androidTest suite to actually run: our instrumented
         // tests use @RunWith(AndroidJUnit4::class). Without this, AGP falls back
         // to the legacy android.test.InstrumentationTestRunner, which discovers
@@ -52,7 +52,7 @@ android {
         // again (resetting the counter), bump this offset past the last
         // published versionCode once more.
         def ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")
-        versionCode ciRunNumber ? (ciRunNumber.toInteger() + 1000) : 5
+        versionCode ciRunNumber ? (ciRunNumber.toInteger() + 1000) : 11
         // CI passes -PVERSION_NAME_OVERRIDE derived from the git tag (v1.1.0 ->
         // "1.1.0", dev-42 -> "1.1.0-dev.42"). Local builds use the fallback.
         def ciVersionName = project.findProperty('VERSION_NAME_OVERRIDE')
@@ -224,7 +224,9 @@ dependencies {
     // --- JVM unit + Robolectric tests ---
     testImplementation 'junit:junit:4.13.2'
     // 4.14.1 ships android-all for SDK 35; older versions fail with
-    // IllegalArgumentException during RobolectricTestRunner init.
+    // IllegalArgumentException during RobolectricTestRunner init. No released
+    // Robolectric (through 4.15.1) emulates SDK 36 yet, and targetSdk is 36 —
+    // so src/test/resources/robolectric.properties pins tests to sdk=35.
     testImplementation 'org.robolectric:robolectric:4.14.1'
     testImplementation 'androidx.test:core:1.5.0'
     testImplementation 'androidx.test.ext:junit:1.1.5'

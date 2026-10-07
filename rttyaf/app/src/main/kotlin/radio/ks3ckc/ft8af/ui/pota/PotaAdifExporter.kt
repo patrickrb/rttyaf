@@ -30,7 +30,6 @@ import java.util.Locale
  */
 object PotaAdifExporter {
 
-    private const val AUTHORITY = "radio.ks3ckc.ft8af.fileprovider"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** One park's ADIF document plus the filename it should be uploaded/shared under. */
@@ -169,7 +168,9 @@ object PotaAdifExporter {
                 }
 
                 val uris = ArrayList(
-                    files.map { FileProvider.getUriForFile(context, AUTHORITY, it) },
+                    files.map {
+                        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", it)
+                    },
                 )
 
                 val send = if (uris.size == 1) {

@@ -142,6 +142,35 @@ class RttyModemTest {
     }
 
     @Test
+    fun squelch_suppressesNoiseOnlyInput() {
+        // No carrier — just band noise. With squelch on, the framer must not
+        // emit random Baudot; with squelch off it decodes the noise into junk.
+        val rng = Random(7L)
+        val noise = FloatArray(24000) { (rng.nextGaussian() * 0.2).toFloat() }
+        val gated = RttyDecoder(RttyConfig(baudRate = 45.45, squelch = true)).process(noise)
+        val ungated = RttyDecoder(RttyConfig(baudRate = 45.45, squelch = false)).process(noise.copyOf())
+        assertThat(gated.length).isAtMost(1)
+        assertThat(ungated.length).isGreaterThan(gated.length)
+    }
+
+    @Test
+    fun squelchDisabled_copiesWeakSignalBelowFloor() {
+        // A low-amplitude signal whose tone energy sits under the squelch floor
+        // is gated when squelch is on but still decodes with squelch off.
+        val cfg = RttyConfig(baudRate = 45.45, squelch = false)
+        val weak = RttyEncoder(cfg, amplitude = 0.05).encode("DE KS3CKC")
+        assertThat(RttyDecoder(cfg).process(weak)).contains("DE KS3CKC")
+    }
+
+    @Test
+    fun roundTrip_fractionalStopBitsBelowHalf() {
+        // stopBits < 0.5 means the next start edge arrives sooner than the old
+        // fixed 6.5-bit stop sample; the framer must still catch every character.
+        val cfg = RttyConfig(baudRate = 45.45, stopBits = 0.3)
+        assertThat(roundTrip("AB CD 599", cfg)).contains("AB CD 599")
+    }
+
+    @Test
     fun textToCodes_usosReshiftsAfterSpace() {
         val cfg = RttyConfig(baudRate = 45.45, unshiftOnSpace = true)
         // "1 2": FIGS,1,SPACE,(USOS->LETTERS)FIGS,2. The second FIGS proves the
@@ -150,5 +179,39 @@ class RttyModemTest {
         assertThat(codes).containsExactly(
             Baudot.LTRS, Baudot.FIGS, 0x17, Baudot.SPACE, Baudot.FIGS, 0x13,
         ).inOrder()
+    }
+
+    // ---- TX wiring (feat/rtty-tx) ------------------------------------------
+
+    @Test
+    fun txMessage_framesWithLeadingSpaceAndCrlf() {
+        // The over is wrapped with a leading idle space and a trailing CR/LF so a
+        // receiver has a resting character before the payload and a clean line end.
+        assertThat(txMessage("CQ DE KS3CKC")).isEqualTo(" CQ DE KS3CKC\r\n")
+        // Operator whitespace is trimmed before framing so double spacing/newlines
+        // don't leak into the wrapped message.
+        assertThat(txMessage("  TEST  ")).isEqualTo(" TEST\r\n")
+    }
+
+    @Test
+    fun txSampleRate_prefersSoundCardRateButFallsBackWhenImplausible() {
+        // Normal case: use the reported sound-card rate.
+        assertThat(txSampleRate(audioRate = 48000, fallback = 12000)).isEqualTo(48000)
+        assertThat(txSampleRate(audioRate = 44100, fallback = 12000)).isEqualTo(44100)
+        // Misconfigured / unset audio rate falls back to the modem's own rate so
+        // we never build an AudioTrack at an impossible rate.
+        assertThat(txSampleRate(audioRate = 0, fallback = 12000)).isEqualTo(12000)
+        assertThat(txSampleRate(audioRate = 100, fallback = 12000)).isEqualTo(12000)
+    }
+
+    @Test
+    fun txWaveform_atSoundCardRate_isDecodable() {
+        // Transmit modulates at the sound-card rate (e.g. 48 kHz), not the 12 kHz
+        // RX rate. Prove that waveform still round-trips: same tones, more samples.
+        val base = RttyConfig(baudRate = 45.45)
+        val txCfg = base.copy(sampleRate = 48000)
+        val samples = RttyEncoder(txCfg).encode(txMessage("CQ DE KS3CKC"))
+        val decoded = RttyDecoder(txCfg).process(samples)
+        assertThat(decoded).contains("CQ DE KS3CKC")
     }
 }
