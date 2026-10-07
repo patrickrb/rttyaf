@@ -224,7 +224,9 @@ dependencies {
     // --- JVM unit + Robolectric tests ---
     testImplementation 'junit:junit:4.13.2'
     // 4.14.1 ships android-all for SDK 35; older versions fail with
-    // IllegalArgumentException during RobolectricTestRunner init.
+    // IllegalArgumentException during RobolectricTestRunner init. No released
+    // Robolectric (through 4.15.1) emulates SDK 36 yet, and targetSdk is 36 —
+    // so src/test/resources/robolectric.properties pins tests to sdk=35.
     testImplementation 'org.robolectric:robolectric:4.14.1'
     testImplementation 'androidx.test:core:1.5.0'
     testImplementation 'androidx.test.ext:junit:1.1.5'

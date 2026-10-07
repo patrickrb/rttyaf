@@ -12,15 +12,15 @@ import com.k1af.ft8af.R
  *
  * The original implementation had a hardcoded "FT8US" typo in AboutSettings.
  * This test verifies that the string resource used for that label resolves to the
- * correct app name "FT8AF", so a future accidental rename or resource-ID swap will
+ * correct app name "RTTYAF", so a future accidental rename or resource-ID swap will
  * be caught before it ships.
  */
 @RunWith(RobolectricTestRunner::class)
 class AboutAppNameTest {
 
     @Test
-    fun appName_stringResource_resolves_to_FT8AF() {
+    fun appName_stringResource_resolves_to_RTTYAF() {
         val context = RuntimeEnvironment.getApplication()
-        assertThat(context.getString(R.string.app_name)).isEqualTo("FT8AF")
+        assertThat(context.getString(R.string.app_name)).isEqualTo("RTTYAF")
     }
 }
