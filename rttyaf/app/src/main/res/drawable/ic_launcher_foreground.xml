@@ -33,36 +33,27 @@
         android:strokeWidth="3.2"
         android:strokeLineCap="round" />
 
-    <!-- RTTY mark/space two-tone motif: two rounded FSK bars.
-         Drawn as round-capped vertical strokes so the ends are pill-shaped. -->
-    <!-- MARK bar (violet). -->
-    <path android:pathData="M50.5,47 L50.5,67"
-        android:strokeWidth="6"
-        android:strokeLineCap="round">
-        <aapt:attr name="android:strokeColor">
+    <!-- Center disc (AF-family motif, like FT8AF's operator QTH) with a
+         mark-to-space gradient: violet top fading to fuchsia-pink bottom. -->
+    <path android:pathData="M54,57 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0">
+        <aapt:attr name="android:fillColor">
             <gradient android:type="linear"
-                android:startX="50.5" android:startY="46"
-                android:endX="50.5" android:endY="68">
+                android:startX="54" android:startY="50"
+                android:endX="54" android:endY="64">
                 <item android:offset="0" android:color="#FFD7C9FF" />
                 <item android:offset="0.5" android:color="#FFA78BFA" />
-                <item android:offset="1" android:color="#FF7C5CFF" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <!-- SPACE bar (fuchsia). -->
-    <path android:pathData="M57.5,47 L57.5,67"
-        android:strokeWidth="6"
-        android:strokeLineCap="round">
-        <aapt:attr name="android:strokeColor">
-            <gradient android:type="linear"
-                android:startX="57.5" android:startY="46"
-                android:endX="57.5" android:endY="68">
-                <item android:offset="0" android:color="#FFFFC4E4" />
-                <item android:offset="0.5" android:color="#FFF472B6" />
                 <item android:offset="1" android:color="#FFD64F97" />
             </gradient>
         </aapt:attr>
     </path>
+    <!-- Center disc rim. -->
+    <path android:pathData="M54,57 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0"
+        android:fillColor="#00000000"
+        android:strokeColor="#99E9DFFF"
+        android:strokeWidth="0.4" />
+    <!-- Top-left specular highlight on the disc. -->
+    <path android:pathData="M52,54.5 m-2.4,0 a2.4,1.6 0 1,0 4.8,0 a2.4,1.6 0 1,0 -4.8,0"
+        android:fillColor="#A0F7F2FF" />
 
     <!-- Tiny signal sparks along the outer arc edges. -->
     <path android:pathData="M22,57 m-0.6,0 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0"
