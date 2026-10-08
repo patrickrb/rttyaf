@@ -2,29 +2,29 @@
   <defs>
     <!-- Background gradient matching app theme -->
     <radialGradient id="bg" cx="512" cy="250" r="600" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#1A2238"/>
-      <stop offset="0.6" stop-color="#0A1020"/>
-      <stop offset="1" stop-color="#04070E"/>
+      <stop offset="0" stop-color="#1A1A38"/>
+      <stop offset="0.6" stop-color="#0C0A20"/>
+      <stop offset="1" stop-color="#05040E"/>
     </radialGradient>
-    <!-- Amber halo behind icon -->
+    <!-- Violet halo behind icon -->
     <radialGradient id="icon-halo" cx="200" cy="250" r="160" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFAF5E" stop-opacity="0.12"/>
-      <stop offset="0.6" stop-color="#FFAF5E" stop-opacity="0.03"/>
-      <stop offset="1" stop-color="#FFAF5E" stop-opacity="0"/>
+      <stop offset="0" stop-color="#A78BFA" stop-opacity="0.12"/>
+      <stop offset="0.6" stop-color="#A78BFA" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#A78BFA" stop-opacity="0"/>
     </radialGradient>
     <!-- Subtle horizontal light streak -->
     <linearGradient id="streak" x1="0" y1="250" x2="1024" y2="250" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFAF5E" stop-opacity="0"/>
-      <stop offset="0.15" stop-color="#FFAF5E" stop-opacity="0.04"/>
-      <stop offset="0.5" stop-color="#FFAF5E" stop-opacity="0.02"/>
-      <stop offset="0.85" stop-color="#FFAF5E" stop-opacity="0.04"/>
-      <stop offset="1" stop-color="#FFAF5E" stop-opacity="0"/>
+      <stop offset="0" stop-color="#A78BFA" stop-opacity="0"/>
+      <stop offset="0.15" stop-color="#A78BFA" stop-opacity="0.04"/>
+      <stop offset="0.5" stop-color="#A78BFA" stop-opacity="0.02"/>
+      <stop offset="0.85" stop-color="#A78BFA" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#A78BFA" stop-opacity="0"/>
     </linearGradient>
-    <!-- Icon disc gradient -->
-    <linearGradient id="disc-grad" x1="200" y1="220" x2="200" y2="280" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFD7A0"/>
-      <stop offset="0.5" stop-color="#FFAF5E"/>
-      <stop offset="1" stop-color="#FF8A2C"/>
+    <!-- Icon disc gradient: violet mark fading to fuchsia-pink space -->
+    <linearGradient id="disc-grad" x1="54" y1="50" x2="54" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D7C9FF"/>
+      <stop offset="0.5" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#D64F97"/>
     </linearGradient>
   </defs>
 
@@ -33,45 +33,45 @@
   <rect width="1024" height="500" fill="url(#streak)"/>
 
   <!-- Decorative range rings (faint, behind everything) -->
-  <circle cx="200" cy="250" r="180" fill="none" stroke="#A0B6DC" stroke-opacity="0.06" stroke-width="0.8"/>
-  <circle cx="200" cy="250" r="140" fill="none" stroke="#A0B6DC" stroke-opacity="0.08" stroke-width="0.8"/>
+  <circle cx="200" cy="250" r="180" fill="none" stroke="#ADA6DC" stroke-opacity="0.06" stroke-width="0.8"/>
+  <circle cx="200" cy="250" r="140" fill="none" stroke="#ADA6DC" stroke-opacity="0.08" stroke-width="0.8"/>
 
-  <!-- Amber halo behind icon area -->
+  <!-- Violet halo behind icon area -->
   <circle cx="200" cy="250" r="160" fill="url(#icon-halo)"/>
 
   <!-- ===== ICON (scaled up, centered at 200, 250) ===== -->
   <g transform="translate(200,250) scale(4.2) translate(-54,-57)">
     <!-- Range rings -->
-    <circle cx="54" cy="57" r="30" fill="none" stroke="#A0B6DC" stroke-opacity="0.2" stroke-width="0.6"/>
-    <circle cx="54" cy="57" r="21" fill="none" stroke="#A0B6DC" stroke-opacity="0.2" stroke-width="0.6"/>
+    <circle cx="54" cy="57" r="30" fill="none" stroke="#ADA6DC" stroke-opacity="0.2" stroke-width="0.6"/>
+    <circle cx="54" cy="57" r="21" fill="none" stroke="#ADA6DC" stroke-opacity="0.2" stroke-width="0.6"/>
     <!-- Signal arcs -->
-    <path d="M22,57 A32,32 0 0,1 86,57" fill="none" stroke="#FFAF5E" stroke-opacity="0.333" stroke-width="2.2" stroke-linecap="round"/>
-    <path d="M30,57 A24,24 0 0,1 78,57" fill="none" stroke="#FFAF5E" stroke-opacity="0.6" stroke-width="2.8" stroke-linecap="round"/>
-    <path d="M38,57 A16,16 0 0,1 70,57" fill="none" stroke="#FFC880" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M22,57 A32,32 0 0,1 86,57" fill="none" stroke="#A78BFA" stroke-opacity="0.333" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M30,57 A24,24 0 0,1 78,57" fill="none" stroke="#A78BFA" stroke-opacity="0.6" stroke-width="2.8" stroke-linecap="round"/>
+    <path d="M38,57 A16,16 0 0,1 70,57" fill="none" stroke="#D7C9FF" stroke-width="3.2" stroke-linecap="round"/>
     <!-- Center disc -->
     <circle cx="54" cy="57" r="7" fill="url(#disc-grad)"/>
-    <circle cx="54" cy="57" r="7" fill="none" stroke="#FFE6BE" stroke-opacity="0.6" stroke-width="0.4"/>
+    <circle cx="54" cy="57" r="7" fill="none" stroke="#E9DFFF" stroke-opacity="0.6" stroke-width="0.4"/>
     <!-- Specular highlight -->
-    <ellipse cx="52" cy="54.5" rx="2.4" ry="1.6" fill="#FFF5DC" fill-opacity="0.627"/>
+    <ellipse cx="52" cy="54.5" rx="2.4" ry="1.6" fill="#F7F2FF" fill-opacity="0.627"/>
     <!-- Sparks -->
-    <circle cx="22" cy="57" r="0.6" fill="#FFD7A0" fill-opacity="0.5"/>
-    <circle cx="86" cy="57" r="0.6" fill="#FFD7A0" fill-opacity="0.5"/>
-    <circle cx="30" cy="57" r="0.6" fill="#FFD7A0" fill-opacity="0.5"/>
-    <circle cx="78" cy="57" r="0.6" fill="#FFD7A0" fill-opacity="0.5"/>
+    <circle cx="22" cy="57" r="0.6" fill="#D7C9FF" fill-opacity="0.5"/>
+    <circle cx="86" cy="57" r="0.6" fill="#D7C9FF" fill-opacity="0.5"/>
+    <circle cx="30" cy="57" r="0.6" fill="#FFC4E4" fill-opacity="0.5"/>
+    <circle cx="78" cy="57" r="0.6" fill="#FFC4E4" fill-opacity="0.5"/>
   </g>
 
   <!-- ===== TEXT ===== -->
   <!-- App name -->
-  <text x="420" y="225" font-family="'SF Pro Display', 'Helvetica Neue', 'Arial', sans-serif" font-size="72" font-weight="700" fill="#FFFFFF" letter-spacing="2">FT8AF</text>
+  <text x="420" y="225" font-family="'SF Pro Display', 'Helvetica Neue', 'Arial', sans-serif" font-size="72" font-weight="700" fill="#FFFFFF" letter-spacing="2">RTTYAF</text>
 
   <!-- Tagline -->
-  <text x="423" y="290" font-family="'SF Pro Display', 'Helvetica Neue', 'Arial', sans-serif" font-size="28" font-weight="400" fill="#A0B6DC" letter-spacing="0.5">FT8 on Android</text>
+  <text x="423" y="290" font-family="'SF Pro Display', 'Helvetica Neue', 'Arial', sans-serif" font-size="28" font-weight="400" fill="#ADA6DC" letter-spacing="0.5">RTTY on Android</text>
 
   <!-- Subtitle -->
-  <text x="423" y="335" font-family="'SF Pro Display', 'Helvetica Neue', 'Arial', sans-serif" font-size="20" font-weight="400" fill="#A0B6DC" fill-opacity="0.6" letter-spacing="0.3">Decode the band. Work the world.</text>
+  <text x="423" y="335" font-family="'SF Pro Display', 'Helvetica Neue', 'Arial', sans-serif" font-size="20" font-weight="400" fill="#ADA6DC" fill-opacity="0.6" letter-spacing="0.3">Decode the shift. Work the world.</text>
 
   <!-- Decorative dots along bottom edge (like waterfall frequency markers) -->
-  <g fill="#FFAF5E" fill-opacity="0.15">
+  <g fill="#A78BFA" fill-opacity="0.15">
     <circle cx="50" cy="470" r="1.5"/>
     <circle cx="100" cy="470" r="1.5"/>
     <circle cx="150" cy="470" r="1.5"/>

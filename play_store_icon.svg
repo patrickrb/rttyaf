@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Play Store icon: the launcher-icon artwork (full semicircle signal
+       arcs over the AF-family center disc) at FT8AF's play-store proportions,
+       in RTTYAF's violet/pink palette. Render with:
+         rsvg-convert -w 512 -h 512 play_store_icon.svg -o play_store_icon.png -->
+  <defs>
+    <radialGradient id="ps-bg" cx="50%" cy="42%" r="60%">
+      <stop offset="0%" stop-color="#1a1a38"/>
+      <stop offset="55%" stop-color="#0c0a20"/>
+      <stop offset="100%" stop-color="#05040e"/>
+    </radialGradient>
+    <radialGradient id="ps-halo" cx="50%" cy="52%" r="40%">
+      <stop offset="0%" stop-color="rgba(167,139,250,0.20)"/>
+      <stop offset="70%" stop-color="rgba(167,139,250,0.04)"/>
+      <stop offset="100%" stop-color="rgba(167,139,250,0)"/>
+    </radialGradient>
+    <linearGradient id="ps-disc" x1="54" y1="50" x2="54" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d7c9ff"/>
+      <stop offset="0.5" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#d64f97"/>
+    </linearGradient>
+    <clipPath id="ps-clip">
+      <circle cx="256" cy="256" r="256"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#ps-clip)">
+    <rect x="0" y="0" width="512" height="512" fill="url(#ps-bg)"/>
+    <circle cx="256" cy="266" r="240" fill="url(#ps-halo)"/>
+    <!-- Launcher-icon artwork (108-unit box) scaled to play-store proportions -->
+    <g transform="translate(256,256) scale(4.7) translate(-54,-54)">
+      <!-- Range rings -->
+      <circle cx="54" cy="57" r="30" fill="none" stroke="#ADA6DC" stroke-opacity="0.2" stroke-width="0.6"/>
+      <circle cx="54" cy="57" r="21" fill="none" stroke="#ADA6DC" stroke-opacity="0.2" stroke-width="0.6"/>
+      <!-- Full-semicircle signal arcs (outer to inner, increasing opacity) -->
+      <path d="M22,57 A32,32 0 0,1 86,57" fill="none" stroke="#A78BFA" stroke-opacity="0.333" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M30,57 A24,24 0 0,1 78,57" fill="none" stroke="#A78BFA" stroke-opacity="0.6" stroke-width="2.8" stroke-linecap="round"/>
+      <path d="M38,57 A16,16 0 0,1 70,57" fill="none" stroke="#D7C9FF" stroke-width="3.2" stroke-linecap="round"/>
+      <!-- Center disc: violet mark fading to fuchsia-pink space -->
+      <circle cx="54" cy="57" r="7" fill="url(#ps-disc)"/>
+      <circle cx="54" cy="57" r="7" fill="none" stroke="#E9DFFF" stroke-opacity="0.6" stroke-width="0.4"/>
+      <ellipse cx="52" cy="54.5" rx="2.4" ry="1.6" fill="#F7F2FF" fill-opacity="0.627"/>
+      <!-- Sparks at the arc ends -->
+      <circle cx="22" cy="57" r="0.6" fill="#D7C9FF" fill-opacity="0.5"/>
+      <circle cx="86" cy="57" r="0.6" fill="#D7C9FF" fill-opacity="0.5"/>
+      <circle cx="30" cy="57" r="0.6" fill="#FFC4E4" fill-opacity="0.5"/>
+      <circle cx="78" cy="57" r="0.6" fill="#FFC4E4" fill-opacity="0.5"/>
+    </g>
+  </g>
+</svg>
