@@ -143,8 +143,10 @@ data class RttyCandidate(val markHz: Double, val spaceHz: Double, val strength: 
  * of an RTTY signal — and return them strongest-first.
  *
  * A bin is a peak when it reaches [minLevel] and is not lower than its
- * neighbours. For each peak we look for a partner peak within ±[toleranceBins]
- * of `peak + shift`; the pair's strength is the weaker of the two levels.
+ * neighbours. For each peak we look for a partner within ±[toleranceBins] of
+ * `peak + shift` that is itself a peak by the same test — so a strong carrier's
+ * skirt or a broad noise shoulder can't stand in for the second tone; the
+ * pair's strength is the weaker of the two levels.
  * Overlapping pairs — closer than half a shift, or sharing a tone (one shift
  * apart, e.g. a three-line comb) — collapse to the stronger one.
  * Because only one tone is keyed at any instant, callers should pass a column
@@ -161,15 +163,16 @@ fun findRttyCandidates(
     if (spectrum.size < 3 || binHz <= 0.0 || shiftHz <= 0) return emptyList()
     val shiftBins = (shiftHz / binHz).roundToInt()
     if (shiftBins < 2) return emptyList()
-    val peaks = ArrayList<Int>()
-    for (b in 1 until spectrum.size - 1) {
+    fun isPeak(b: Int): Boolean {
+        if (b < 1 || b > spectrum.size - 2) return false
         val v = spectrum[b]
-        if (v >= minLevel && v >= spectrum[b - 1] && v >= spectrum[b + 1]) peaks.add(b)
+        return v >= minLevel && v >= spectrum[b - 1] && v >= spectrum[b + 1]
     }
+    val peaks = (1 until spectrum.size - 1).filter(::isPeak)
     val found = ArrayList<RttyCandidate>()
     for (p in peaks) {
         val partner = strongestBin(spectrum, p + shiftBins, toleranceBins, minLevel)
-        if (partner < 0) continue
+        if (partner < 0 || !isPeak(partner)) continue
         found.add(RttyCandidate(p * binHz, p * binHz + shiftHz, minOf(spectrum[p], spectrum[partner])))
     }
     found.sortByDescending { it.strength }
@@ -219,8 +222,18 @@ class AfcTracker(
     /**
      * Compute the corrected mark frequency for the current column.
      * Returns [markHz] unchanged when no signal is present or no correction is needed.
+     * The result is held inside the anchor's drift window *and* the passband
+     * ([minHz]..[maxHz] for both tones, as [clampMarkHz]), so an anchor at the
+     * passband edge can't be pushed over it.
      */
-    fun update(spectrum: FloatArray, binHz: Double, markHz: Double, shiftHz: Int): Double {
+    fun update(
+        spectrum: FloatArray,
+        binHz: Double,
+        markHz: Double,
+        shiftHz: Int,
+        minHz: Double = 100.0,
+        maxHz: Double = 3000.0,
+    ): Double {
         if (spectrum.isEmpty() || binHz <= 0.0) return markHz
         val markOffset = centroidOffset(spectrum, binHz, markHz)
         val spaceOffset = centroidOffset(spectrum, binHz, markHz + shiftHz)
@@ -232,7 +245,7 @@ class AfcTracker(
         }
         val step = (offset * gain).coerceIn(-maxStepHz, maxStepHz)
         val proposed = (markHz + step).coerceIn(anchorHz - maxDriftHz, anchorHz + maxDriftHz)
-        return proposed
+        return clampMarkHz(proposed, shiftHz, minHz, maxHz)
     }
 
     /**

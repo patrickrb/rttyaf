@@ -101,4 +101,13 @@ class WaterfallModelTest {
         assertThat(classifyGesture(300f, 30f, cursors, 8f, 20f)).isEqualTo(WaterfallGesture.PAN)
         assertThat(classifyGesture(300f, 30f, emptyList(), 8f, 20f)).isEqualTo(WaterfallGesture.PAN)
     }
+
+    @Test
+    fun gesture_travelCountsBothAxes_soAVerticalSwipeIsNotATap() {
+        assertThat(gestureTravelPx(10f, 10f, 10f, 40f)).isEqualTo(30f)
+        assertThat(gestureTravelPx(0f, 0f, 3f, 4f)).isEqualTo(5f)
+        assertThat(gestureTravelPx(5f, 5f, 5f, 5f)).isEqualTo(0f)
+        val vertical = gestureTravelPx(300f, 0f, 300f, 40f)
+        assertThat(classifyGesture(300f, vertical, listOf(100f), touchSlopPx = 8f, grabRadiusPx = 20f)).isEqualTo(WaterfallGesture.PAN)
+    }
 }

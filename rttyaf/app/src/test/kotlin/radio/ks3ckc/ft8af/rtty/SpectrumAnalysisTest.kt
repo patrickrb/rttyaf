@@ -168,6 +168,37 @@ class SpectrumAnalysisTest {
         assertThat(abs(found[0].markHz - 1500.0)).isAtMost(1.5 * binHz)
     }
 
+    @Test
+    fun scanner_partnerMustBeAPeak_notASkirtOrShoulder() {
+        // A real tone at 1000 Hz whose +170 Hz neighbourhood is a rising slope
+        // (the shoulder of something louder just above), not a tone of its own.
+        val col = column(1000.0 to 0.9f)
+        val base = ((1000.0 + 170.0) / binHz).roundToInt()
+        col[base - 1] = 0.5f; col[base] = 0.6f; col[base + 1] = 0.7f; col[base + 2] = 0.8f
+        assertThat(findRttyCandidates(col, binHz, 170)).isEmpty()
+    }
+
+    @Test
+    fun scanner_ignoresAStrongCarrierThroughTheRealFft() {
+        // Not an idealised single bin: a loud, Hann-windowed carrier run through
+        // the engine's FFT + floor-relative scaler, so leakage/saturation are real.
+        val cfg = RttyConfig()
+        val rnd = Random(3)
+        val pcm = FloatArray(cfg.sampleRate * 2) { (0.9 * kotlin.math.sin(2 * Math.PI * 1500.0 * it / cfg.sampleRate) + rnd.nextGaussian() * 0.002).toFloat() }
+        val fft = SimpleFft(RttyEngine.FFT_SIZE)
+        val scaler = WaterfallScaler()
+        var avg = FloatArray(0)
+        val chunk = cfg.sampleRate * RttyEngine.CHUNK_MS / 1000
+        var i = 0
+        while (i + chunk <= pcm.size) {
+            avg = blendColumn(avg, scaler.scale(fft.linearMagnitudes(pcm.copyOfRange(i, i + chunk), cfg.sampleRate, RttyEngine.DISPLAY_MAX_HZ)), RttyEngine.SCAN_ALPHA)
+            i += chunk
+        }
+        assertThat(avg.max()).isEqualTo(1f) // it really is saturating the display range
+        assertThat(findRttyCandidates(avg, binHz, 170)).isEmpty()
+        assertThat(findRttyCandidates(avg, binHz, 850)).isEmpty()
+    }
+
     // ---- AfcTracker --------------------------------------------------------
 
     @Test
@@ -198,6 +229,24 @@ class SpectrumAnalysisTest {
         var mark = 1500.0
         repeat(50) { mark = afc.update(col, binHz, mark, 170) }
         assertThat(mark).isEqualTo(1520.0)
+    }
+
+    @Test
+    fun afc_neverCarriesATonePastThePassbandEdge() {
+        // Anchored at the lowest legal mark with the signal pulling downward:
+        // the drift window would allow 90 Hz, the passband does not.
+        val low = AfcTracker()
+        low.anchor(100.0)
+        assertThat(low.update(column(60.0 to 0.9f, 230.0 to 0.9f), binHz, 100.0, 170)).isEqualTo(100.0)
+        // Anchored at the highest legal mark (3000 − shift) with the signal pulling upward.
+        val high = AfcTracker()
+        high.anchor(2830.0)
+        val col = column(2860.0 to 0.9f, 3030.0 to 0.9f, bins = 300)
+        assertThat(high.update(col, binHz, 2830.0, 170, maxHz = 3000.0)).isEqualTo(2830.0)
+        // Away from the edges the clamp is inert.
+        val mid = AfcTracker()
+        mid.anchor(1480.0)
+        assertThat(mid.update(column(1500.0 to 0.9f, 1670.0 to 0.9f), binHz, 1480.0, 170)).isGreaterThan(1480.0)
     }
 
     @Test
