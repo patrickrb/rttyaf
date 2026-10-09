@@ -1,6 +1,12 @@
 package radio.ks3ckc.ft8af.ui.rtty
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -30,9 +35,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.max
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -70,6 +89,7 @@ fun OperateScreen(state: RttyAppState) {
     val txOn by engine.transmittingLive.observeAsState(false)
 
     var utc by remember { mutableStateOf(utcNow()) }
+    val hasCandidates = engine.candidates.isNotEmpty()
     LaunchedEffect(Unit) {
         while (true) {
             utc = utcNow()
@@ -120,13 +140,16 @@ fun OperateScreen(state: RttyAppState) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("MARK ${cfg.markToneHz.toInt()}", color = Signal, fontSize = 11.sp, fontFamily = GeistMonoFamily)
                     Text("SPACE ${cfg.spaceToneHz.toInt()}", color = Accent, fontSize = 11.sp, fontFamily = GeistMonoFamily)
+                    if (hasCandidates) {
+                        Text("${engine.candidates.size} SIG", color = TextMuted, fontSize = 11.sp, fontFamily = GeistMonoFamily)
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     MiniToggle("AFC", engine.afc) { engine.afc = !engine.afc }
                     MiniToggle("NET", engine.net) { engine.net = !engine.net }
                 }
             }
-            Waterfall(engine, Modifier.fillMaxWidth().height(108.dp))
+            Waterfall(engine, Modifier.fillMaxWidth().height(160.dp))
         }
 
         // ---- RX + TX panes ----
@@ -253,47 +276,137 @@ private fun RxPane(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modifie
     }
 }
 
+/**
+ * The RX waterfall. Renders the engine's noise-floor-relative spectrum into a
+ * scrolling bitmap ([WaterfallImage]) and shows the slice selected by a
+ * zoomable [WaterfallViewport]. Overlays: the mark/space tuning cursor (shaded
+ * band between the two tone lines), brackets over scanned RTTY candidate pairs,
+ * and a frequency axis that re-labels itself as you zoom.
+ *
+ * Gestures: tap tunes to the signal under the finger (snapping to the nearest
+ * peak or candidate pair); dragging the cursor fine-tunes; dragging elsewhere
+ * pans; pinch zooms. The decision logic lives in [classifyGesture].
+ */
 @Composable
 private fun Waterfall(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modifier) {
-    // Snapshot-backed so appending a spectrum column invalidates the Canvas draw;
-    // a plain ArrayDeque would only repaint on incidental recomposition.
-    val history = remember { mutableStateListOf<FloatArray>() }
+    val bgArgb = BgSurface.toArgb()
+    val signalArgb = Signal.toArgb()
+    var viewport by remember { mutableStateOf(WaterfallViewport.default(radio.ks3ckc.ft8af.rtty.RttyEngine.DISPLAY_MAX_HZ)) }
+    var image by remember { mutableStateOf<WaterfallImage?>(null) }
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    // Bumped per pushed column so the Canvas redraws; the bitmap itself is mutable.
+    var frame by remember { mutableStateOf(0) }
+
     LaunchedEffect(engine.spectrum) {
         val col = engine.spectrum
-        if (col.isNotEmpty()) {
-            history.add(col)
-            while (history.size > MAX_ROWS) history.removeAt(0)
+        if (col.isEmpty()) return@LaunchedEffect
+        var img = image
+        if (img == null || img.width != col.size) {
+            img = WaterfallImage(col.size, MAX_ROWS) { waterfallArgb(it, bgArgb, signalArgb) }
+            image = img
+            bitmap = Bitmap.createBitmap(img.width, img.height, Bitmap.Config.ARGB_8888)
         }
+        img.push(col)
+        bitmap?.setPixels(img.pixels, 0, img.width, 0, 0, img.width, img.height)
+        frame++
     }
-    Box(modifier) {
-        Canvas(Modifier.fillMaxSize()) {
-            val rows = history.toList()
-            if (rows.isNotEmpty()) {
-                val rowH = size.height / MAX_ROWS
-                rows.forEachIndexed { idx, col ->
-                    val y = size.height - (rows.size - idx) * rowH
-                    val bins = col.size
-                    val cellW = size.width / bins
-                    for (b in 0 until bins) {
-                        val m = col[b]
-                        if (m > 0.06f) {
-                            val c = if (m < 0.5f) lerp(BgSurface, Signal, m * 2f)
-                            else lerp(Signal, Color.White, (m - 0.5f) * 2f)
-                            drawRect(c.copy(alpha = 0.9f), Offset(b * cellW, y), androidx.compose.ui.geometry.Size(cellW + 0.5f, rowH + 0.5f))
-                        }
+
+    val textMeasurer = rememberTextMeasurer()
+    val axisStyle = TextStyle(color = TextFaint, fontSize = 9.sp, fontFamily = GeistMonoFamily)
+    val grabRadiusPx = with(LocalDensity.current) { 18.dp.toPx() }
+    val binHz = engine.binHz
+
+    Box(
+        modifier.pointerInput(engine) {
+            val slop = viewConfiguration.touchSlop
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                val startX = down.position.x
+                val width = size.width.toFloat()
+                var maxTravel = 0f
+                var mode: WaterfallGesture? = null
+                var pinching = false
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val pressed = event.changes.filter { it.pressed }
+                    if (pressed.isEmpty()) break
+                    if (pressed.size >= 2) {
+                        pinching = true
+                        val zoom = event.calculateZoom()
+                        val pan = event.calculatePan()
+                        val centroid = event.calculateCentroid()
+                        viewport = viewport.zoom(zoom, centroid.x / width).pan(-pan.x / width)
+                        event.changes.forEach { it.consume() }
+                        continue
                     }
+                    // Once a pinch has started, a lone remaining finger must not
+                    // turn into a tune or pan as the other lifts.
+                    if (pinching) continue
+                    val ch = pressed[0]
+                    maxTravel = max(maxTravel, gestureTravelPx(down.position.x, down.position.y, ch.position.x, ch.position.y))
+                    if (mode == null) {
+                        val cfg = engine.config
+                        val cursorXs = listOf(viewport.fractionOf(cfg.markHz) * width, viewport.fractionOf(cfg.spaceHz) * width)
+                        val g = classifyGesture(startX, maxTravel, cursorXs, slop, grabRadiusPx)
+                        if (g != WaterfallGesture.TAP) mode = g
+                    }
+                    val dx = ch.position.x - ch.previousPosition.x
+                    when (mode) {
+                        WaterfallGesture.DRAG_TUNE -> engine.nudge(dx / width * viewport.spanHz)
+                        WaterfallGesture.PAN -> viewport = viewport.pan(-dx / width)
+                        else -> {}
+                    }
+                    if (mode != null) ch.consume()
                 }
+                if (!pinching && mode == null) engine.tuneTapped(viewport.hzAt(startX / width))
             }
-            // mark/space tuning cursors
-            drawRect(Signal.copy(alpha = 0.85f), Offset(size.width * engine.markFraction, 0f), androidx.compose.ui.geometry.Size(1.5f, size.height))
-            drawRect(Accent.copy(alpha = 0.85f), Offset(size.width * engine.spaceFraction, 0f), androidx.compose.ui.geometry.Size(1.5f, size.height))
-        }
-        Row(
-            Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(horizontal = 6.dp, vertical = 3.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            listOf("500", "1000", "1500", "2000", "2500", "3000").forEach {
-                Text(it, color = TextFaint, fontSize = 9.sp, fontFamily = GeistMonoFamily)
+        },
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            @Suppress("UNUSED_VARIABLE") val redraw = frame
+            val vp = viewport
+            val bmp = bitmap
+            if (bmp != null && binHz > 0.0) {
+                // Source bins covering the viewport, then stretched (nearest
+                // neighbour, so bins stay crisp) onto the canvas width.
+                val bin0 = floor(vp.loHz / binHz).toInt().coerceIn(0, bmp.width - 1)
+                val bin1 = ceil(vp.hiHz / binHz).toInt().coerceIn(bin0 + 1, bmp.width)
+                val x0 = vp.fractionOf(bin0 * binHz) * size.width
+                val x1 = vp.fractionOf(bin1 * binHz) * size.width
+                drawImage(
+                    bmp.asImageBitmap(),
+                    srcOffset = IntOffset(bin0, 0), srcSize = IntSize(bin1 - bin0, bmp.height),
+                    dstOffset = IntOffset(x0.roundToInt(), 0), dstSize = IntSize((x1 - x0).roundToInt().coerceAtLeast(1), size.height.toInt()),
+                    filterQuality = FilterQuality.None,
+                )
+            }
+            // Candidate RTTY pairs: a bracket across each mark..space span at the top.
+            engine.candidates.forEach { c ->
+                val xa = vp.fractionOf(c.markHz - 20.0) * size.width
+                val xb = vp.fractionOf(c.spaceHz + 20.0) * size.width
+                if (xb < 0f || xa > size.width) return@forEach
+                val col = Accent.copy(alpha = 0.4f + 0.5f * c.strength)
+                drawRect(col, Offset(xa, 2f), Size(xb - xa, 2f))
+                drawRect(col, Offset(xa, 2f), Size(2f, 8f))
+                drawRect(col, Offset(xb - 2f, 2f), Size(2f, 8f))
+            }
+            // Tuning cursor: shaded band between the tones plus a line on each.
+            val cfg = engine.config
+            val xm = vp.fractionOf(cfg.markHz) * size.width
+            val xs = vp.fractionOf(cfg.spaceHz) * size.width
+            drawRect(Signal.copy(alpha = 0.10f), Offset(xm, 0f), Size(xs - xm, size.height))
+            drawRect(Signal.copy(alpha = 0.9f), Offset(xm - 0.75f, 0f), Size(1.5f, size.height))
+            drawRect(Accent.copy(alpha = 0.9f), Offset(xs - 0.75f, 0f), Size(1.5f, size.height))
+            // Grab handles hinting the cursor can be dragged.
+            drawRect(Signal.copy(alpha = 0.6f), Offset(xm - 4f, size.height - 12f), Size(8f, 12f))
+            drawRect(Accent.copy(alpha = 0.6f), Offset(xs - 4f, size.height - 12f), Size(8f, 12f))
+            // Frequency axis.
+            axisTicks(vp.loHz, vp.hiHz).forEach { hz ->
+                val x = vp.fractionOf(hz.toDouble()) * size.width
+                val layout = textMeasurer.measure(hz.toString(), axisStyle)
+                val tx = (x - layout.size.width / 2f).coerceIn(2f, size.width - layout.size.width - 2f)
+                drawRect(TextFaint.copy(alpha = 0.5f), Offset(x, size.height - 4f), Size(1f, 4f))
+                drawText(layout, topLeft = Offset(tx, size.height - layout.size.height - 3f))
             }
         }
     }
@@ -384,4 +497,4 @@ private fun utcNow(): String {
 
 private fun trimNum(d: Double): String = if (d == d.toLong().toDouble()) d.toLong().toString() else d.toString()
 
-private const val MAX_ROWS = 44
+private const val MAX_ROWS = 100

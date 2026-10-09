@@ -30,6 +30,24 @@ class SimpleFft(private val size: Int) {
      * samples are zero-padded; more are truncated to the newest [size].
      */
     fun magnitudes(samples: FloatArray, sampleRate: Int, maxHz: Double): FloatArray {
+        val lin = linearMagnitudes(samples, sampleRate, maxHz)
+        val out = FloatArray(lin.size)
+        var mx = 1e-6f
+        for (i in lin.indices) {
+            val v = ln(1.0 + lin[i]).toFloat()
+            out[i] = v
+            if (v > mx) mx = v
+        }
+        for (i in out.indices) out[i] = (out[i] / mx).coerceIn(0f, 1f)
+        return out
+    }
+
+    /**
+     * Windowed *linear* magnitude spectrum of [samples] from DC up to [maxHz],
+     * un-normalised, for callers that track their own noise floor (see
+     * [WaterfallScaler]). Bin `i` is centred at `i * sampleRate / size` Hz.
+     */
+    fun linearMagnitudes(samples: FloatArray, sampleRate: Int, maxHz: Double): DoubleArray {
         val offset = if (samples.size > size) samples.size - size else 0
         for (i in 0 until size) {
             val s = if (offset + i < samples.size) samples[offset + i].toDouble() else 0.0
@@ -38,16 +56,11 @@ class SimpleFft(private val size: Int) {
         }
         transform(re, im)
         val maxBin = min(size / 2, ((maxHz * size) / sampleRate).toInt().coerceAtLeast(1))
-        val out = FloatArray(maxBin)
-        var mx = 1e-6f
-        for (i in 0 until maxBin) {
-            val v = ln(1.0 + hypot(re[i], im[i])).toFloat()
-            out[i] = v
-            if (v > mx) mx = v
-        }
-        for (i in out.indices) out[i] = (out[i] / mx).coerceIn(0f, 1f)
-        return out
+        return DoubleArray(maxBin) { hypot(re[it], im[it]) }
     }
+
+    /** Width of one bin in Hz for a given sample rate. */
+    fun binHz(sampleRate: Int): Double = sampleRate.toDouble() / size
 
     private fun transform(re: DoubleArray, im: DoubleArray) {
         val n = size
