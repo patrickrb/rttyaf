@@ -22,6 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import radio.ks3ckc.ft8af.rtty.RttyEngine
+import radio.ks3ckc.ft8af.rtty.spots.SpotService
+import radio.ks3ckc.ft8af.rtty.spots.formatDialLabel
+import radio.ks3ckc.ft8af.rtty.spots.RttySegments
 import radio.ks3ckc.ft8af.theme.BgApp
 
 /** A logged RTTY contact, kept in memory for the Log screen (DB logging is phase 2). */
@@ -48,7 +51,7 @@ data class RttyMacro(val name: String, val key: String, val text: String)
  * operator entry, macro set and in-memory log. Held once by [RttyafApp] and
  * handed to each screen. Mutable Compose state so edits reflect everywhere.
  */
-class RttyAppState(val engine: RttyEngine) {
+class RttyAppState(val engine: RttyEngine, val spots: SpotService, private val callsignProvider: () -> String = { "" }) {
     var call by mutableStateOf("")
     var rstSent by mutableStateOf("599")
     var rstRcvd by mutableStateOf("599")
@@ -72,9 +75,15 @@ class RttyAppState(val engine: RttyEngine) {
 
     val log = mutableStateListOf<RttyLogEntry>()
 
-    val myCall = "KS3CKC"
-    val bandLabel = "14.084 MHz · 20m"
-    val bandShort = "20m"
+    /** Operator callsign from the app's settings, with the design default as a fallback. */
+    val myCall: String get() = callsignProvider().trim().uppercase().ifBlank { "KS3CKC" }
+
+    /** "14.084 MHz · 20m", following the rig dial the spot service tracks. */
+    val bandLabel: String get() = formatDialLabel(spots.dialHz)
+    val bandShort: String get() = RttySegments.bandOf(spots.dialHz) ?: "?"
+
+    /** Upper-case calls already in the in-memory log (greys out worked spots). */
+    val workedCalls: Set<String> get() = log.map { it.call.uppercase() }.toSet()
 
     /** Expand {VAR} tokens in a macro against current entry state. */
     fun expand(text: String): String = text
@@ -93,8 +102,8 @@ enum class RttyTab { OPERATE, CONTEST, MACROS, LOG, SETTINGS }
  * the app shell (see ComposeMainActivity.setContent).
  */
 @Composable
-fun RttyafApp(engine: RttyEngine) {
-    val state = remember(engine) { RttyAppState(engine) }
+fun RttyafApp(engine: RttyEngine, spots: SpotService, callsignProvider: () -> String = { "" }) {
+    val state = remember(engine, spots) { RttyAppState(engine, spots, callsignProvider) }
     var tab by rememberSaveable { mutableStateOf(RttyTab.OPERATE) }
     val insets = WindowInsets.systemBars.asPaddingValues()
 

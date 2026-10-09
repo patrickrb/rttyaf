@@ -74,6 +74,9 @@ import radio.ks3ckc.ft8af.theme.TextFaint
 import radio.ks3ckc.ft8af.theme.TextMuted
 import radio.ks3ckc.ft8af.theme.TextPrimary
 import kotlinx.coroutines.flow.collectLatest
+import radio.ks3ckc.ft8af.rtty.spots.RbnClient
+import androidx.compose.ui.geometry.Rect
+import radio.ks3ckc.ft8af.rtty.spots.goIsCopying
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -90,6 +93,10 @@ fun OperateScreen(state: RttyAppState) {
 
     var utc by remember { mutableStateOf(utcNow()) }
     val hasCandidates = engine.candidates.isNotEmpty()
+    val spots = state.spots
+    var showSpots by remember { mutableStateOf(false) }
+    // Call prefill from tap-to-go lands here (the service only knows the engine).
+    LaunchedEffect(spots.goTarget) { spots.goTarget?.let { state.call = it.spot.call } }
     LaunchedEffect(Unit) {
         while (true) {
             utc = utcNow()
@@ -109,6 +116,12 @@ fun OperateScreen(state: RttyAppState) {
                 Text("UTC $utc", color = TextMuted, fontSize = 13.sp, fontFamily = GeistMonoFamily)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val segCount = spots.segmentSpots().size
+                SpotsChip(
+                    count = segCount,
+                    live = spots.rbnState == RbnClient.State.LIVE || spots.pskLastOkMs != null,
+                    onClick = { showSpots = true },
+                )
                 Chip(
                     text = if (engine.listening) "RX" else "IDLE",
                     dot = if (engine.listening) StatusConfirmed else TextFaint,
@@ -127,9 +140,12 @@ fun OperateScreen(state: RttyAppState) {
             }
         }
 
+        // ---- Band rail / go banner ----
+        BandRail(spots, engine.rxText, onOpenSheet = { showSpots = true }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+
         // ---- Waterfall card ----
         Column(
-            Modifier.padding(horizontal = 16.dp).clip(RoundedCornerShape(12.dp))
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp).clip(RoundedCornerShape(12.dp))
                 .background(BgSurface).border(1.dp, Border, RoundedCornerShape(12.dp))
         ) {
             Row(
@@ -149,7 +165,11 @@ fun OperateScreen(state: RttyAppState) {
                     MiniToggle("NET", engine.net) { engine.net = !engine.net }
                 }
             }
-            Waterfall(engine, Modifier.fillMaxWidth().height(160.dp))
+            Waterfall(
+                engine, Modifier.fillMaxWidth().height(160.dp),
+                tags = waterfallTags(spots.spots, spots.dialHz),
+                onTagTap = { tag -> spots.go(tag.spot) },
+            )
         }
 
         // ---- RX + TX panes ----
@@ -245,6 +265,22 @@ fun OperateScreen(state: RttyAppState) {
             }
         }
     }
+    if (showSpots) SpotsSheet(spots, state.workedCalls) { showSpots = false }
+    spots.pendingCrossBand?.let { CrossBandConfirm(spots, it, cfg.markHz.toInt()) }
+}
+
+/** Header chip: live dot + spot count for the current segment; opens the sheet. */
+@Composable
+private fun SpotsChip(count: Int, live: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.clip(RoundedCornerShape(999.dp)).background(BgSurface).border(1.dp, Border, RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(Modifier.width(7.dp).height(7.dp).clip(RoundedCornerShape(999.dp)).background(if (live) StatusConfirmed else TextFaint))
+        Text("SPOTS", color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text(count.toString(), color = if (count > 0) Accent else TextFaint, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = GeistMonoFamily)
+    }
 }
 
 /**
@@ -288,8 +324,16 @@ private fun RxPane(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modifie
  * pans; pinch zooms. The decision logic lives in [classifyGesture].
  */
 @Composable
-private fun Waterfall(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modifier) {
+private fun Waterfall(
+    engine: radio.ks3ckc.ft8af.rtty.RttyEngine,
+    modifier: Modifier,
+    tags: List<WaterfallTag> = emptyList(),
+    onTagTap: (WaterfallTag) -> Unit = {},
+) {
     val bgArgb = BgSurface.toArgb()
+    // Tag hit boxes, refreshed on every draw so a tap can be matched to a spot.
+    val tagRects = remember { mutableListOf<Pair<Rect, WaterfallTag>>() }
+    val tagStyle = TextStyle(color = TextPrimary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, fontFamily = GeistMonoFamily)
     val signalArgb = Signal.toArgb()
     var viewport by remember { mutableStateOf(WaterfallViewport.default(radio.ks3ckc.ft8af.rtty.RttyEngine.DISPLAY_MAX_HZ)) }
     var image by remember { mutableStateOf<WaterfallImage?>(null) }
@@ -358,7 +402,10 @@ private fun Waterfall(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modi
                     }
                     if (mode != null) ch.consume()
                 }
-                if (!pinching && mode == null) engine.tuneTapped(viewport.hzAt(startX / width))
+                if (!pinching && mode == null) {
+                    val hit = tagRects.firstOrNull { it.first.contains(down.position) }
+                    if (hit != null) onTagTap(hit.second) else engine.tuneTapped(viewport.hzAt(startX / width))
+                }
             }
         },
     ) {
@@ -400,6 +447,31 @@ private fun Waterfall(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modi
             // Grab handles hinting the cursor can be dragged.
             drawRect(Signal.copy(alpha = 0.6f), Offset(xm - 4f, size.height - 12f), Size(8f, 12f))
             drawRect(Accent.copy(alpha = 0.6f), Offset(xs - 4f, size.height - 12f), Size(8f, 12f))
+            // Spot tags: callsigns from RBN/PSK at their audio offset. Solid once the
+            // decoder has printed that call recently.
+            tagRects.clear()
+            val recentRx = engine.rxText.takeLast(600)
+            var tagY = size.height * 0.36f
+            tags.sortedBy { it.audioHz }.forEach { tag ->
+                val x = vp.fractionOf(tag.audioHz.toDouble()) * size.width
+                if (x < -40f || x > size.width + 40f) return@forEach
+                val confirmed = goIsCopying(recentRx, 0, tag.spot.call)
+                val layout = textMeasurer.measure(tag.spot.call, tagStyle)
+                val w = layout.size.width + 12f
+                val h = layout.size.height + 6f
+                val left = (x - w / 2f).coerceIn(0f, size.width - w)
+                val rect = Rect(left, tagY, left + w, tagY + h)
+                val base = if (tag.spot.source == radio.ks3ckc.ft8af.rtty.spots.SpotSource.RBN) RbnGreen else TextMuted
+                drawRoundRect(
+                    if (confirmed) base else base.copy(alpha = 0.18f),
+                    Offset(rect.left, rect.top), Size(rect.width, rect.height), androidx.compose.ui.geometry.CornerRadius(5f, 5f),
+                )
+                if (!confirmed) drawRoundRect(base.copy(alpha = 0.7f), Offset(rect.left, rect.top), Size(rect.width, rect.height), androidx.compose.ui.geometry.CornerRadius(5f, 5f), style = androidx.compose.ui.graphics.drawscope.Stroke(1f))
+                drawText(layout, color = if (confirmed) BgApp else TextPrimary, topLeft = Offset(rect.left + 6f, rect.top + 3f))
+                tagRects.add(rect to tag)
+                tagY += h + 4f
+                if (tagY > size.height * 0.7f) tagY = size.height * 0.36f
+            }
             // Frequency axis.
             axisTicks(vp.loHz, vp.hiHz).forEach { hz ->
                 val x = vp.fractionOf(hz.toDouble()) * size.width
