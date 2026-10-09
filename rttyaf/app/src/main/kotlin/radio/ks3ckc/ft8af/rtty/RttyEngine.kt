@@ -144,7 +144,9 @@ class RttyEngine(
         scanAverage = blendColumn(scanAverage, column, SCAN_ALPHA)
         candidates = findRttyCandidates(scanAverage, binHz, config.shiftHz)
         if (afc) {
-            val corrected = afcTracker.update(scanAverage, binHz, config.markHz, config.shiftHz)
+            // Same passband bounds as tune(): AFC may drift around the anchor but
+            // never carry a tone outside what the decoder/display covers.
+            val corrected = afcTracker.update(scanAverage, binHz, config.markHz, config.shiftHz, maxHz = DISPLAY_MAX_HZ)
             if (kotlin.math.abs(corrected - config.markHz) >= AFC_MIN_CHANGE_HZ) setMark(corrected)
         }
     }
@@ -247,7 +249,15 @@ class RttyEngine(
         synchronized(audioLock) {
             val out = decoder.process(samples)
             if (out.isNotEmpty()) appendRx(out)
-            analyse(samples)
+            // Analyse in the same CHUNK_MS slices the recorder delivers, so the
+            // scanner's blended average sees both tones keyed over the burst
+            // rather than one FFT of its (mark-idle) tail.
+            val chunk = config.sampleRate * CHUNK_MS / 1000
+            var i = 0
+            while (i < samples.size) {
+                analyse(samples.copyOfRange(i, minOf(i + chunk, samples.size)))
+                i += chunk
+            }
         }
     }
 

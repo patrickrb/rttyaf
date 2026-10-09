@@ -387,7 +387,7 @@ private fun Waterfall(
                     // turn into a tune or pan as the other lifts.
                     if (pinching) continue
                     val ch = pressed[0]
-                    maxTravel = max(maxTravel, abs(ch.position.x - startX))
+                    maxTravel = max(maxTravel, gestureTravelPx(down.position.x, down.position.y, ch.position.x, ch.position.y))
                     if (mode == null) {
                         val cfg = engine.config
                         val cursorXs = listOf(viewport.fractionOf(cfg.markHz) * width, viewport.fractionOf(cfg.spaceHz) * width)

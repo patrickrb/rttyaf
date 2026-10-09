@@ -3,6 +3,7 @@ package radio.ks3ckc.ft8af.ui.rtty
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.hypot
 
 /**
  * Plain-Kotlin geometry and pixel logic behind the Operate-screen waterfall,
@@ -143,6 +144,13 @@ fun lerpArgb(a: Int, b: Int, t: Float): Int {
 
 /** What a single-finger gesture on the waterfall turns into. */
 enum class WaterfallGesture { TAP, DRAG_TUNE, PAN }
+
+/**
+ * Straight-line distance a finger has travelled from where it went down, in
+ * px. Both axes count: a vertical swipe must break the tap threshold just as
+ * a horizontal one does, otherwise lifting after a scroll would retune.
+ */
+fun gestureTravelPx(downX: Float, downY: Float, x: Float, y: Float): Float = hypot(x - downX, y - downY)
 
 /**
  * Classify a finished or in-progress single-finger gesture. A finger that
