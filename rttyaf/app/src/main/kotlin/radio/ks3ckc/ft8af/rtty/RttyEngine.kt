@@ -43,20 +43,57 @@ class RttyEngine(
     var rxText by mutableStateOf("")
         private set
 
-    /** Latest normalised magnitude spectrum, DC..[DISPLAY_MAX_HZ]. */
+    /**
+     * Characters decoded since start, never trimmed or cleared. [rxText] loses
+     * its front once it reaches [MAX_RX], so anyone who wants "text since X"
+     * must mark X here, not as an index into the buffer (see `goIsCopying`).
+     */
+    @Volatile
+    var rxTotalChars: Long = 0L
+        private set
+
+    /**
+     * Latest display spectrum, DC..[DISPLAY_MAX_HZ]: per-bin level 0..1 where 0
+     * is the tracked noise floor and 1 is [WaterfallScaler.rangeDb] above it,
+     * so brightness is comparable from column to column (see [WaterfallScaler]).
+     */
     var spectrum by mutableStateOf(FloatArray(0))
+        private set
+
+    /** Likely RTTY signals (mark/space pairs) found in the recent spectrum, strongest first. */
+    var candidates by mutableStateOf<List<RttyCandidate>>(emptyList())
         private set
 
     var listening by mutableStateOf(false)
         private set
 
-    /** Automatic frequency control / tuning-net toggles (display + future demod use). */
-    var afc by mutableStateOf(true)
+    private var afcState by mutableStateOf(true)
+
+    /** Automatic frequency control: track the tuned signal's drift (see [AfcTracker]). */
+    var afc: Boolean
+        get() = afcState
+        set(value) {
+            afcState = value
+            // Switching AFC on re-anchors at wherever the operator has it now.
+            if (value) synchronized(audioLock) { afcTracker.anchor(config.markHz) }
+        }
+
+    /** Tuning net toggle (TX follows RX tones; display only for now). */
     var net by mutableStateOf(true)
 
     private var decoder = RttyDecoder(config)
     private var monitor: HamRecorder.VoiceDataMonitor? = null
     private val fft = SimpleFft(FFT_SIZE)
+    private val scaler = WaterfallScaler()
+    private val afcTracker = AfcTracker().also { it.anchor(config.markHz) }
+
+    /** Width of one spectrum bin in Hz. */
+    val binHz: Double get() = fft.binHz(config.sampleRate)
+
+    // Slow average of the display spectrum for the pair scanner: only one RTTY
+    // tone is keyed at any instant, so a single FFT frame may show just one
+    // line; a few frames blended together show the pair.
+    private var scanAverage = FloatArray(0)
 
     // The decoder and fft carry mutable per-sample state and reuse internal
     // buffers, so every path that touches them — the audio callback, the config
@@ -68,12 +105,6 @@ class RttyEngine(
     // Rolling RX text kept in a StringBuilder so each decoded chunk trims in
     // place instead of allocating two full-length strings on the audio thread.
     private val rxBuffer = StringBuilder()
-
-    /** MARK tone position as a 0..1 fraction of the displayed span, for the cursor overlay. */
-    val markFraction: Float get() = (config.markToneHz / DISPLAY_MAX_HZ).toFloat().coerceIn(0f, 1f)
-
-    /** SPACE tone position as a 0..1 fraction of the displayed span. */
-    val spaceFraction: Float get() = (config.spaceToneHz / DISPLAY_MAX_HZ).toFloat().coerceIn(0f, 1f)
 
     /** Begin continuous RX: tap the recorder and decode every chunk. Idempotent. */
     fun start() {
@@ -99,13 +130,63 @@ class RttyEngine(
         synchronized(audioLock) {
             val decoded = decoder.process(chunk)
             if (decoded.isNotEmpty()) appendRx(decoded)
-            spectrum = fft.magnitudes(chunk, config.sampleRate, DISPLAY_MAX_HZ)
+            analyse(chunk)
         }
+    }
+
+    /**
+     * Update the display spectrum, the candidate-pair scan and (when enabled)
+     * AFC from one audio chunk. Callers hold [audioLock].
+     */
+    private fun analyse(chunk: FloatArray) {
+        val column = scaler.scale(fft.linearMagnitudes(chunk, config.sampleRate, DISPLAY_MAX_HZ))
+        spectrum = column
+        scanAverage = blendColumn(scanAverage, column, SCAN_ALPHA)
+        candidates = findRttyCandidates(scanAverage, binHz, config.shiftHz)
+        if (afc) {
+            // Same passband bounds as tune(): AFC may drift around the anchor but
+            // never carry a tone outside what the decoder/display covers.
+            val corrected = afcTracker.update(scanAverage, binHz, config.markHz, config.shiftHz, maxHz = DISPLAY_MAX_HZ)
+            if (kotlin.math.abs(corrected - config.markHz) >= AFC_MIN_CHANGE_HZ) setMark(corrected)
+        }
+    }
+
+    /**
+     * Tune to a tap on the waterfall at [hz]. A tap inside a scanned candidate
+     * pair locks onto that pair exactly; otherwise the tap snaps to the nearest
+     * peak and its partner tone is inferred (see [resolveMarkHz]).
+     */
+    fun tuneTapped(hz: Double) {
+        val mark = synchronized(audioLock) {
+            candidates.firstOrNull { hz >= it.markHz - TAP_MARGIN_HZ && hz <= it.spaceHz + TAP_MARGIN_HZ }?.markHz
+                ?: resolveMarkHz(spectrum, binHz, hz, config.shiftHz, maxHz = DISPLAY_MAX_HZ)
+        }
+        tune(mark)
+    }
+
+    /** Tune the mark (lower) tone to [markHz] exactly and re-anchor AFC there. */
+    fun tune(markHz: Double) {
+        synchronized(audioLock) {
+            val clamped = clampMarkHz(markHz, config.shiftHz, maxHz = DISPLAY_MAX_HZ)
+            afcTracker.anchor(clamped)
+            setMark(clamped)
+        }
+    }
+
+    /** Fine-tune: move the tone pair by [deltaHz] (drag on the waterfall cursor). */
+    fun nudge(deltaHz: Double) = tune(config.markHz + deltaHz)
+
+    /** Retune the live decoder without rebuilding it. Callers hold [audioLock]. */
+    private fun setMark(markHz: Double) {
+        if (markHz == config.markHz) return
+        config = config.copy(markHz = markHz)
+        decoder.retune(markHz)
     }
 
     /** Append decoded text, trimming the front in place. Callers hold [audioLock]. */
     private fun appendRx(s: String) {
         rxBuffer.append(s)
+        rxTotalChars += s.length
         val over = rxBuffer.length - MAX_RX
         if (over > 0) rxBuffer.delete(0, over)
         rxText = rxBuffer.toString()
@@ -141,18 +222,17 @@ class RttyEngine(
         transmitSignal?.stopRttyTx()
     }
 
-    /** Swap demod parameters (baud/shift/tones); rebuilds the decoder and re-taps if live. */
+    /** Swap demod parameters (baud/shift/tones); rebuilds the decoder in place. */
     fun applyConfig(newConfig: RttyConfig) {
         // Under audioLock so the decoder swap can't land mid-process() on the
-        // audio thread.
+        // audio thread. The recorder tap doesn't depend on config, so it stays.
         synchronized(audioLock) {
             config = newConfig
-            if (listening) {
-                stop()
-                start()
-            } else {
-                decoder = RttyDecoder(newConfig)
-            }
+            decoder = RttyDecoder(newConfig)
+            afcTracker.anchor(newConfig.markHz)
+            scaler.reset()
+            scanAverage = FloatArray(0)
+            candidates = emptyList()
         }
     }
 
@@ -169,7 +249,15 @@ class RttyEngine(
         synchronized(audioLock) {
             val out = decoder.process(samples)
             if (out.isNotEmpty()) appendRx(out)
-            spectrum = fft.magnitudes(samples, config.sampleRate, DISPLAY_MAX_HZ)
+            // Analyse in the same CHUNK_MS slices the recorder delivers, so the
+            // scanner's blended average sees both tones keyed over the burst
+            // rather than one FFT of its (mark-idle) tail.
+            val chunk = config.sampleRate * CHUNK_MS / 1000
+            var i = 0
+            while (i < samples.size) {
+                analyse(samples.copyOfRange(i, minOf(i + chunk, samples.size)))
+                i += chunk
+            }
         }
     }
 
@@ -179,7 +267,25 @@ class RttyEngine(
         const val MAX_RX = 4000
         const val FFT_SIZE = 1024
         const val DISPLAY_MAX_HZ = 3000.0
+        /** Blend weight of each new column into the scanner's running average. */
+        const val SCAN_ALPHA = 0.3f
+        /** AFC corrections smaller than this are ignored (sub-bin jitter). */
+        const val AFC_MIN_CHANGE_HZ = 1.0
+        /** How far outside a candidate's mark..space span a tap still counts as "on it". */
+        const val TAP_MARGIN_HZ = 30.0
     }
+}
+
+/**
+ * Exponential blend of [column] into [average]: `avg += alpha * (col - avg)`.
+ * Returns [column] itself when sizes differ (first column or FFT change) so
+ * the average re-seeds instead of mixing mismatched bins. Pure — unit-tested.
+ */
+internal fun blendColumn(average: FloatArray, column: FloatArray, alpha: Float): FloatArray {
+    if (average.size != column.size) return column.copyOf()
+    val out = FloatArray(column.size)
+    for (i in column.indices) out[i] = average[i] + alpha * (column[i] - average[i])
+    return out
 }
 
 /**
