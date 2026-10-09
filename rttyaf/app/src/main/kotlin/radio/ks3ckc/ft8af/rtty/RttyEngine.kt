@@ -44,6 +44,15 @@ class RttyEngine(
         private set
 
     /**
+     * Characters decoded since start, never trimmed or cleared. [rxText] loses
+     * its front once it reaches [MAX_RX], so anyone who wants "text since X"
+     * must mark X here, not as an index into the buffer (see `goIsCopying`).
+     */
+    @Volatile
+    var rxTotalChars: Long = 0L
+        private set
+
+    /**
      * Latest display spectrum, DC..[DISPLAY_MAX_HZ]: per-bin level 0..1 where 0
      * is the tracked noise floor and 1 is [WaterfallScaler.rangeDb] above it,
      * so brightness is comparable from column to column (see [WaterfallScaler]).
@@ -175,6 +184,7 @@ class RttyEngine(
     /** Append decoded text, trimming the front in place. Callers hold [audioLock]. */
     private fun appendRx(s: String) {
         rxBuffer.append(s)
+        rxTotalChars += s.length
         val over = rxBuffer.length - MAX_RX
         if (over > 0) rxBuffer.delete(0, over)
         rxText = rxBuffer.toString()

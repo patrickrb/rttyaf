@@ -455,7 +455,7 @@ private fun Waterfall(
             tags.sortedBy { it.audioHz }.forEach { tag ->
                 val x = vp.fractionOf(tag.audioHz.toDouble()) * size.width
                 if (x < -40f || x > size.width + 40f) return@forEach
-                val confirmed = goIsCopying(recentRx, 0, tag.spot.call)
+                val confirmed = goIsCopying(recentRx, recentRx.length.toLong(), 0L, tag.spot.call)
                 val layout = textMeasurer.measure(tag.spot.call, tagStyle)
                 val w = layout.size.width + 12f
                 val h = layout.size.height + 6f

@@ -82,6 +82,10 @@ fun filterSpots(spots: List<RttySpot>, filter: SpotFilter, segment: RttySegment,
 fun spotsPerBand(spots: List<RttySpot>): List<Pair<String, Int>> =
     spots.mapNotNull { it.band }.groupingBy { it }.eachCount().toList().sortedByDescending { it.second }
 
+/** Whether the "rig refused the QSY" notice is still fresh enough to show. */
+fun showGoRefused(refusedAtMs: Long?, nowMs: Long, showForMs: Long = 5_000L): Boolean =
+    refusedAtMs != null && nowMs - refusedAtMs in 0 until showForMs
+
 /** "18s", "3m", "1h" style age text. */
 fun ageLabel(ageSeconds: Long): String = when {
     ageSeconds < 60 -> "${ageSeconds}s"

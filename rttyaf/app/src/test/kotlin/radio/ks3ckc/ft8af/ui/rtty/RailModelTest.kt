@@ -82,6 +82,15 @@ class RailModelTest {
     }
 
     @Test
+    fun goRefusedNotice_showsBrieflyThenGoesAway() {
+        assertThat(showGoRefused(null, now)).isFalse()
+        assertThat(showGoRefused(now, now)).isTrue()
+        assertThat(showGoRefused(now, now + 4_999)).isTrue()
+        assertThat(showGoRefused(now, now + 5_000)).isFalse()
+        assertThat(showGoRefused(now + 1, now)).isFalse() // clock skew: never from the future
+    }
+
+    @Test
     fun labels_ageAndSummary() {
         assertThat(ageLabel(18)).isEqualTo("18s")
         assertThat(ageLabel(180)).isEqualTo("3m")

@@ -100,6 +100,9 @@ fun BandRail(service: SpotService, rxText: String, onOpenSheet: () -> Unit, modi
             }
             SourceHealth(service, now)
         }
+        if (showGoRefused(service.goRefusedAtMs, now)) {
+            Text("Rig is transmitting — QSY skipped. Tap again after the over.", color = Accent, fontSize = 11.sp)
+        }
         // Pips change every second (ages tick); keep the gesture detector stable
         // and read the latest list through state so a tap mid-tick isn't dropped.
         val latestPips = rememberUpdatedState(pips)
@@ -214,7 +217,7 @@ private fun RailStateOverlay(service: SpotService, empty: Boolean, onOpenSheet: 
 fun GoBanner(service: SpotService, go: SpotService.GoTarget, rxText: String, modifier: Modifier = Modifier) {
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(go) { while (true) { now = System.currentTimeMillis(); delay(500) } }
-    val copying = goIsCopying(rxText, go.rxMark, go.spot.call)
+    val copying = goIsCopying(rxText, service.rxTotalChars, go.rxMark, go.spot.call)
     val settling = now - go.startedMs < QSY_SETTLE_MS && go.plan !is SpotTuner.Plan.TuneOnly
     val status = when {
         copying -> "● copying" to RbnGreen

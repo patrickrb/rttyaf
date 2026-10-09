@@ -30,7 +30,8 @@ import radio.ks3ckc.ft8af.rtty.RttyEngine
  */
 class SpotService(
     private val engine: RttyEngine,
-    private val qsy: (Long) -> Unit,
+    /** Move the rig dial; returns false when the rig refused (e.g. mid-transmit). */
+    private val qsy: (Long) -> Boolean,
     private val dialProvider: () -> Long,
     private val callsignProvider: () -> String,
     private val onCallPrefill: (String) -> Unit = {},
@@ -67,15 +68,29 @@ class SpotService(
     var pendingCrossBand by mutableStateOf<RttySpot?>(null)
         private set
 
+    /** When the rig last refused a go's QSY (it was transmitting), for a brief notice; null otherwise. */
+    var goRefusedAtMs by mutableStateOf<Long?>(null)
+        private set
+
     /** Callsign RBN will log in with, or blank when none is configured. */
     val rbnCallsign: String get() = callsignProvider().trim().uppercase()
+
+    /** Decoder character count, the monotonic clock [GoTarget.rxMark] is measured on. */
+    val rxTotalChars: Long get() = engine.rxTotalChars
 
     private var scope: CoroutineScope? = null
     private var rbn: RbnClient? = null
     private var tickJob: Job? = null
-    private var lastSegment: RttySegment? = null
 
-    data class GoTarget(val spot: RttySpot, val startedMs: Long, val plan: SpotTuner.Plan, val rxMark: Int)
+    /** The segment the last PSK request covered, and when any PSK request was last issued. */
+    private var pskSegment: RttySegment? = null
+    private var lastPskAttemptMs: Long = 0L
+
+    /**
+     * An in-flight go. [rxMark] is the engine's [RttyEngine.rxTotalChars] at go
+     * time, so "text since the go" survives the RX buffer trimming its front.
+     */
+    data class GoTarget(val spot: RttySpot, val startedMs: Long, val plan: SpotTuner.Plan, val rxMark: Long)
 
     fun start() {
         if (scope != null) return
@@ -112,16 +127,29 @@ class SpotService(
         rbn = rbnFactory(call, { spot -> board.add(spot) }, { st -> rbnState = st }).also { it.start() }
     }
 
-    /** One scheduler tick: refresh dial, prune, publish, and poll PSK when due. Also usable from tests. */
+    /**
+     * One scheduler tick: refresh dial, prune, publish, and poll PSK when due.
+     * Also usable from tests.
+     *
+     * PSK is due when the dial has left the segment the last request covered
+     * (not merely moved: outside the known RTTY segments [RttySegments.forDial]
+     * synthesises a window around the dial, which would otherwise count as a
+     * new segment on every kHz), when nothing has succeeded yet, or every
+     * [PskRttyClient.COOLDOWN_MS]. However due, requests are never issued
+     * closer together than [PSK_MIN_INTERVAL_MS], so spinning the dial across
+     * a band can't hammer the service.
+     */
     suspend fun tick() {
         val now = clock()
         dialHz = dialProvider()
         board.prune(now)
         val seg = segment
-        val segmentChanged = lastSegment != seg
-        lastSegment = seg
         publish(now)
-        if (segmentChanged || pskLastOkMs == null || now - (pskLastOkMs ?: 0L) >= PskRttyClient.COOLDOWN_MS) {
+        val leftSegment = pskSegment?.contains(dialHz) != true
+        val due = leftSegment || pskLastOkMs == null || now - (pskLastOkMs ?: 0L) >= PskRttyClient.COOLDOWN_MS
+        if (due && now - lastPskAttemptMs >= PSK_MIN_INTERVAL_MS) {
+            lastPskAttemptMs = now
+            pskSegment = seg
             val result = withContext(Dispatchers.IO) { psk.fetch(seg.loHz - PSK_MARGIN_HZ, seg.hiHz + PSK_MARGIN_HZ) }
             if (result != null) {
                 board.addAll(result)
@@ -169,13 +197,24 @@ class SpotService(
         goTarget = null
     }
 
+    /**
+     * Carry out a plan. A dial move the rig refuses (it is keyed) aborts the go
+     * entirely: the decoder is left where it was, no banner is shown and the
+     * CALL field is not touched, so nothing claims a QSY that did not happen.
+     */
     private fun perform(spot: RttySpot, plan: SpotTuner.Plan) {
-        when (plan) {
-            is SpotTuner.Plan.TuneOnly -> engine.tune(plan.audioHz.toDouble())
-            is SpotTuner.Plan.Qsy -> { qsy(plan.dialHz); engine.tune(plan.audioHz.toDouble()) }
-            is SpotTuner.Plan.CrossBand -> { qsy(plan.dialHz); engine.tune(plan.audioHz.toDouble()) }
+        val (newDial, audioHz) = when (plan) {
+            is SpotTuner.Plan.TuneOnly -> null to plan.audioHz
+            is SpotTuner.Plan.Qsy -> plan.dialHz to plan.audioHz
+            is SpotTuner.Plan.CrossBand -> plan.dialHz to plan.audioHz
         }
-        goTarget = GoTarget(spot, clock(), plan, engine.rxText.length)
+        if (newDial != null && !qsy(newDial)) {
+            goRefusedAtMs = clock()
+            return
+        }
+        goRefusedAtMs = null
+        engine.tune(audioHz.toDouble())
+        goTarget = GoTarget(spot, clock(), plan, engine.rxTotalChars)
         onCallPrefill(spot.call)
     }
 
@@ -183,16 +222,20 @@ class SpotService(
         const val TICK_MS = 1_000L
         /** Query a little beyond the segment so edge activity is included. */
         const val PSK_MARGIN_HZ = 5_000L
+        /** Floor between any two PSK Reporter requests, whatever the dial does. */
+        const val PSK_MIN_INTERVAL_MS = 60_000L
     }
 }
 
 /**
  * Has the decoder printed [call] since the go started? [rxText] is the live RX
- * buffer and [rxMark] its length at go time (the buffer is trimmed from the
- * front, so the mark is clamped). Pure — unit-tested.
+ * buffer, [rxTotalChars] the engine's running character count now, and
+ * [rxMark] that count at go time — so the text since the go is the last
+ * `rxTotalChars - rxMark` characters of the buffer, however much of its front
+ * has been trimmed meanwhile. Pure — unit-tested.
  */
-fun goIsCopying(rxText: String, rxMark: Int, call: String): Boolean {
+fun goIsCopying(rxText: String, rxTotalChars: Long, rxMark: Long, call: String): Boolean {
     if (call.isBlank()) return false
-    val from = rxMark.coerceIn(0, rxText.length)
-    return rxText.substring(from).contains(call, ignoreCase = true)
+    val since = (rxTotalChars - rxMark).coerceIn(0L, rxText.length.toLong()).toInt()
+    return rxText.takeLast(since).contains(call, ignoreCase = true)
 }

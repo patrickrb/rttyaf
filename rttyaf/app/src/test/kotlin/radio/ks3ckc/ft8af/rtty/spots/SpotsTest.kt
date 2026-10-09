@@ -146,12 +146,13 @@ class SpotsTest {
 
     @Test
     fun rbnClient_retriesAfterFailedConnect_thenStops() {
-        val states = ArrayList<RbnClient.State>()
-        val sleeps = ArrayList<Long>()
+        // Written on the client's worker thread, read here: thread-safe lists.
+        val states = java.util.concurrent.CopyOnWriteArrayList<RbnClient.State>()
+        val sleeps = java.util.concurrent.CopyOnWriteArrayList<Long>()
         var attempts = 0
         lateinit var client: RbnClient
         client = RbnClient(
-            callsign = "KS3CKC", onSpot = {}, onState = { synchronized(states) { states.add(it) } },
+            callsign = "KS3CKC", onSpot = {}, onState = { states.add(it) },
             transport = {
                 attempts++
                 if (attempts == 1) throw java.io.IOException("refused")
@@ -274,11 +275,38 @@ class SpotsTest {
 
     @Test
     fun goIsCopying_onlyLooksAfterTheMark() {
-        assertThat(goIsCopying("CQ DE K1AF K", 0, "K1AF")).isTrue()
-        assertThat(goIsCopying("CQ DE K1AF K", 8, "K1AF")).isFalse()
-        assertThat(goIsCopying("abc", 99, "K1AF")).isFalse()
-        assertThat(goIsCopying("de k1af", 0, "K1AF")).isTrue()
-        assertThat(goIsCopying("x", 0, "")).isFalse()
+        val text = "CQ DE K1AF K" // 12 chars, nothing trimmed: total == length
+        assertThat(goIsCopying(text, 12, 0, "K1AF")).isTrue()
+        assertThat(goIsCopying(text, 12, 8, "K1AF")).isFalse() // only "AF K" arrived after the mark
+        assertThat(goIsCopying("abc", 3, 99, "K1AF")).isFalse() // mark in the future: nothing since
+        assertThat(goIsCopying("de k1af", 7, 0, "K1AF")).isTrue()
+        assertThat(goIsCopying("x", 1, 0, "")).isFalse()
+    }
+
+    @Test
+    fun goIsCopying_survivesTheRxBufferTrimmingItsFront() {
+        // Buffer at its cap when the go started (mark = 4000 chars decoded so far),
+        // then 12 more chars arrive and the front is trimmed to keep the cap.
+        val buffer = "x".repeat(RttyEngine.MAX_RX - 12) + "CQ DE K1AF K"
+        assertThat(buffer.length).isEqualTo(RttyEngine.MAX_RX)
+        assertThat(goIsCopying(buffer, 4012, 4000, "K1AF")).isTrue()
+        // The same call printed *before* the go must not count.
+        val stale = "CQ DE K1AF K" + "x".repeat(RttyEngine.MAX_RX - 12)
+        assertThat(goIsCopying(stale, 4012, 4000, "K1AF")).isFalse()
+        // A cleared buffer shorter than the chars since the mark: search all of it.
+        assertThat(goIsCopying("DE K1AF", 4100, 4000, "K1AF")).isTrue()
+    }
+
+    @Test
+    fun engine_rxTotalCharsCountsEverythingDecoded_andIgnoresClear() {
+        val engine = RttyEngine(hamRecorder = null).also { it.afc = false }
+        repeat(2) { engine.injectLoopbackTest() }
+        assertThat(engine.rxText).isNotEmpty()
+        assertThat(engine.rxTotalChars).isEqualTo(engine.rxText.length.toLong())
+        val total = engine.rxTotalChars
+        engine.clearRx()
+        assertThat(engine.rxText).isEmpty()
+        assertThat(engine.rxTotalChars).isEqualTo(total)
     }
 
     // ---- SpotService ---------------------------------------------------------------
@@ -287,14 +315,17 @@ class SpotsTest {
         var dial = dial
         var call = call
         val qsys = ArrayList<Long>()
+        /** What the fake rig answers a QSY with; false = "transmitting, refused". */
+        var qsyAccepted = true
         val prefills = ArrayList<String>()
         var rbnStarted = 0
         var rbnOnSpot: ((RttySpot) -> Unit)? = null
+        var pskFetches = 0
         val engine = RttyEngine(hamRecorder = null).also { it.afc = false }
         var t = 1_700_000_000_000L
-        val psk = PskRttyClient(fetcher = { PskRttyClient.FetchResult(if (pskBody == null) 500 else 200, pskBody) }, clock = { t })
+        val psk = PskRttyClient(fetcher = { pskFetches++; PskRttyClient.FetchResult(if (pskBody == null) 500 else 200, pskBody) }, clock = { t })
         val service = SpotService(
-            engine = engine, qsy = { qsys.add(it) }, dialProvider = { this.dial }, callsignProvider = { this.call },
+            engine = engine, qsy = { qsys.add(it); qsyAccepted }, dialProvider = { this.dial }, callsignProvider = { this.call },
             onCallPrefill = { prefills.add(it) }, psk = psk, clock = { t },
             rbnFactory = { c, onSpot, onState ->
                 rbnStarted++
@@ -326,6 +357,62 @@ class SpotsTest {
         f.service.tick()
         assertThat(f.service.pskOffline).isTrue()
         assertThat(f.service.pskLastOkMs).isNull()
+    }
+
+    @Test
+    fun service_pskIsNotRefetchedWhileTuningInsideAFallbackWindow() = runBlocking {
+        // 14.200 is the phone portion: no known RTTY segment, so the service
+        // synthesises a ±10 kHz window around the dial.
+        val f = Fixture(dial = 14_200_000, pskBody = pskXml)
+        f.service.tick()
+        assertThat(f.pskFetches).isEqualTo(1)
+        // Dial moves inside that window on consecutive ticks: no new request.
+        for (hz in listOf(14_203_000L, 14_207_500L, 14_195_000L)) {
+            f.dial = hz; f.t += SpotService.TICK_MS
+            f.service.tick()
+        }
+        assertThat(f.pskFetches).isEqualTo(1)
+        // Leaving the window is due, but still inside the global minimum interval.
+        f.dial = 14_250_000; f.t += SpotService.TICK_MS
+        f.service.tick()
+        assertThat(f.pskFetches).isEqualTo(1)
+        // Once the interval has passed the new window is fetched.
+        f.t += SpotService.PSK_MIN_INTERVAL_MS
+        f.service.tick()
+        assertThat(f.pskFetches).isEqualTo(2)
+        // Back inside a known segment: one more, then quiet until the cooldown.
+        f.dial = 14_084_000; f.t += SpotService.PSK_MIN_INTERVAL_MS
+        f.service.tick()
+        assertThat(f.pskFetches).isEqualTo(3)
+        f.dial = 14_090_000; f.t += SpotService.PSK_MIN_INTERVAL_MS
+        f.service.tick()
+        assertThat(f.pskFetches).isEqualTo(3)
+        f.t += PskRttyClient.COOLDOWN_MS
+        f.service.tick()
+        assertThat(f.pskFetches).isEqualTo(4)
+    }
+
+    @Test
+    fun service_goIsAbortedWhenTheRigRefusesTheQsy() = runBlocking {
+        val f = Fixture()
+        f.service.tick()
+        f.qsyAccepted = false
+        f.service.go(spot("B2B", 14_091_000))
+        assertThat(f.qsys).containsExactly(14_091_000L - f.engine.config.markHz.toLong())
+        assertThat(f.service.goTarget).isNull()
+        assertThat(f.prefills).isEmpty()
+        assertThat(f.service.goRefusedAtMs).isEqualTo(f.t)
+        // Cross-band confirmation can be refused the same way.
+        f.service.go(spot("C3C", 7_041_500))
+        f.service.confirmCrossBand()
+        assertThat(f.service.goTarget).isNull()
+        assertThat(f.service.pendingCrossBand).isNull()
+        // In-passband gos never ask the rig, so they are unaffected.
+        f.service.go(spot("A1A", 14_085_500))
+        assertThat(f.service.goTarget!!.spot.call).isEqualTo("A1A")
+        assertThat(f.service.goTarget!!.rxMark).isEqualTo(f.engine.rxTotalChars)
+        assertThat(f.service.goRefusedAtMs).isNull()
+        assertThat(f.qsys).hasSize(2)
     }
 
     @Test
