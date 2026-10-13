@@ -40,8 +40,11 @@ class RttyDecoder(
     private enum class Mode { SEARCH, RECEIVE }
 
     // --- tone detectors -----------------------------------------------------
-    private val markInc = 2.0 * PI * config.markToneHz / config.sampleRate
-    private val spaceInc = 2.0 * PI * config.spaceToneHz / config.sampleRate
+    /** The lower (MARK) audio frequency currently tuned; see [retune]. */
+    var markHz: Double = config.markHz
+        private set
+    private var markInc = 2.0 * PI * config.markToneHz / config.sampleRate
+    private var spaceInc = 2.0 * PI * config.spaceToneHz / config.sampleRate
     // One-pole smoother with a corner near the baud rate: fast enough to settle
     // within a bit, slow enough to reject the tone's own ripple.
     private val lpAlpha = exp(-2.0 * PI * config.baudRate / config.sampleRate)
@@ -83,6 +86,19 @@ class RttyDecoder(
 
     // --- ITA2 shift state ---------------------------------------------------
     private var figures = false
+
+    /**
+     * Move the mark/space tone pair to [newMarkHz] (lower tone; the shift is
+     * kept) **without** discarding filter, slicer or framing state. Tap-to-tune
+     * and AFC use this so a retune mid-character costs at most that character,
+     * instead of a full decoder rebuild that would also reset the squelch.
+     */
+    fun retune(newMarkHz: Double) {
+        markHz = newMarkHz
+        val tuned = config.copy(markHz = newMarkHz)
+        markInc = 2.0 * PI * tuned.markToneHz / config.sampleRate
+        spaceInc = 2.0 * PI * tuned.spaceToneHz / config.sampleRate
+    }
 
     /** Reset all demodulator state to its power-on condition. */
     fun reset() {
