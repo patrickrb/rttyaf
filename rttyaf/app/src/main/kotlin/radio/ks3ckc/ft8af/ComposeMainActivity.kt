@@ -177,6 +177,20 @@ class ComposeMainActivity : AppCompatActivity() {
                     )
                 }
                 androidx.compose.runtime.LaunchedEffect(Unit) { rttyEngine.start() }
+                // RTTY spot sources (RBN telnet + PSK Reporter) and tap-to-go,
+                // wired to the rig through MainViewModel.qsyTo.
+                val spotService = remember {
+                    radio.ks3ckc.ft8af.rtty.spots.SpotService(
+                        engine = rttyEngine,
+                        qsy = { hz -> mainViewModel.qsyTo(hz) },
+                        dialProvider = { GeneralVariables.band },
+                        callsignProvider = { GeneralVariables.myCallsign ?: "" },
+                    )
+                }
+                androidx.compose.runtime.DisposableEffect(Unit) {
+                    spotService.start()
+                    onDispose { spotService.stop() }
+                }
                 Crossfade(
                     targetState = showSplash,
                     animationSpec = tween(durationMillis = 360),
@@ -187,7 +201,7 @@ class ComposeMainActivity : AppCompatActivity() {
                             onSplashComplete = { showSplash = false }
                         )
                     } else {
-                        radio.ks3ckc.ft8af.ui.rtty.RttyafApp(rttyEngine)
+                        radio.ks3ckc.ft8af.ui.rtty.RttyafApp(rttyEngine, spotService) { GeneralVariables.myCallsign ?: "" }
                     }
                 }
 

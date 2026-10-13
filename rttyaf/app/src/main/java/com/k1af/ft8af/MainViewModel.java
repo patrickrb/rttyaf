@@ -1241,6 +1241,35 @@ public class MainViewModel extends ViewModel {
     }
 
     /**
+     * Move the dial to an arbitrary frequency (RTTY spot "go"): record it as the
+     * current band/dial, persist it, notify band observers and push it to the rig
+     * over CAT. Crossing an amateur band is allowed here only because the RTTY
+     * spot flow asks the operator first (antenna/ATU safety); same-band moves
+     * need no confirmation. Refused while an FT8 or RTTY over is on the air —
+     * like {@link #setOperatingMode} — so CAT never retunes a keyed rig.
+     *
+     * @return true if the dial was moved; false if rejected (non-positive
+     *         frequency, or transmitting)
+     */
+    public boolean qsyTo(long freq) {
+        if (freq <= 0) return false;
+        if (ft8TransmitSignal != null
+                && (ft8TransmitSignal.isTransmitting() || ft8TransmitSignal.isRttyTransmitting())) {
+            fileLog("qsyTo: refused, transmitting (freq=" + freq + ")");
+            return false;
+        }
+        fileLog("qsyTo: " + freq);
+        GeneralVariables.band = freq;
+        GeneralVariables.bandListIndex = OperationBand.getIndexByFreq(freq);
+        if (databaseOpr != null) {
+            databaseOpr.writeConfig("bandFreq", String.valueOf(freq), null);
+        }
+        GeneralVariables.mutableBandChange.postValue(GeneralVariables.bandListIndex);
+        setOperationBand();
+        return true;
+    }
+
+    /**
      * Switch the operating mode (FT8 &lt;-&gt; FT4). Rejected while transmitting so we never
      * end up with a half-FT8/half-FT4 QSO. Persists the mode, rebuilds the RX and TX cycle
      * timers for the new period, retunes the dial to the new mode's frequency within the
