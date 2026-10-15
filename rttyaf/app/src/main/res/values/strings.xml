@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">RTTYAF</string>
+    <string name="band_change_refused_transmitting">Can\'t change band while transmitting</string>
     <string name="nav_menu_title_call_list">Content</string>
     <string name="nav_menu_title_decode_list">Decode</string>
     <string name="nav_menu_title_my_calling">Calling</string>

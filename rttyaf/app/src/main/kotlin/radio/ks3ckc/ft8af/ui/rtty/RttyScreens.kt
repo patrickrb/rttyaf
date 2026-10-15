@@ -40,6 +40,7 @@ import radio.ks3ckc.ft8af.theme.StatusWarn
 import radio.ks3ckc.ft8af.theme.TextFaint
 import radio.ks3ckc.ft8af.theme.TextMuted
 import radio.ks3ckc.ft8af.theme.TextPrimary
+import radio.ks3ckc.ft8af.ui.settings.SettingsScreen
 
 @Composable
 private fun ScreenTitle(title: String, subtitle: String) {
@@ -178,35 +179,27 @@ private fun ScoreTile(value: String, label: String, color: Color) {
     }
 }
 
-// ---------------- SETTINGS (placeholder) ----------------
+// ---------------- SETTINGS ----------------
+
+/**
+ * Settings tab. Hosts the FT8AF-inherited settings (operator identity, Radio &
+ * Audio, Logging & Sync, Advanced, About) with the RTTY Mode screen slotted in
+ * as the first category. Without a [MainViewModel] (tests/previews) only the
+ * RTTY Mode screen is shown, since the other categories drive the rig/DB
+ * through it.
+ */
 @Composable
 fun RttySettingsScreen(state: RttyAppState) {
-    Column(Modifier.fillMaxSize().background(BgApp)) {
-        ScreenTitle("Settings", "${state.myCall} · ${state.myExchange} · RTTYAF 1.0")
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            SettingRow("Radio & Audio", "Rig connection, keying, levels")
-            SettingRow("Logging & Sync", "Cloudlog / Wavelog upload")
-            SettingRow("RTTY Mode", "${trimBaud(state.engine.config.baudRate)} Bd · ${state.engine.config.shiftHz} Hz shift")
-        }
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Settings sub-screens — coming next.", color = TextFaint, fontSize = 13.sp)
+    val vm = state.mainViewModel
+    Box(Modifier.fillMaxSize().background(BgApp)) {
+        if (vm == null) {
+            RttyModeSettings(state, onBack = {})
+        } else {
+            SettingsScreen(
+                mainViewModel = vm,
+                rttyModeSummary = modeSummary(state.mode),
+                rttyModeContent = { onBack -> RttyModeSettings(state, onBack) },
+            )
         }
     }
 }
-
-@Composable
-private fun SettingRow(label: String, desc: String) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(BgSurface)
-            .border(1.dp, Border, RoundedCornerShape(12.dp)).padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column {
-            Text(label, color = TextPrimary, fontSize = 14.sp)
-            Text(desc, color = TextMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
-        }
-        Text("›", color = TextFaint, fontSize = 18.sp)
-    }
-}
-
-private fun trimBaud(d: Double): String = if (d == d.toLong().toDouble()) d.toLong().toString() else d.toString()

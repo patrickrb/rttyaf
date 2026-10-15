@@ -170,10 +170,17 @@ class ComposeMainActivity : AppCompatActivity() {
         setContent {
             FT8AFTheme {
                 var showSplash by remember { mutableStateOf(true) }
+                // Saved RTTY mode settings (baud/shift/tones/AFC...) — read
+                // synchronously so the modem starts on the operator's tones.
+                val rttyStore = remember { radio.ks3ckc.ft8af.rtty.SharedPrefsRttyStore(applicationContext) }
                 val rttyEngine = remember {
+                    val mode = rttyStore.load()
                     radio.ks3ckc.ft8af.rtty.RttyEngine(
                         mainViewModel.hamRecorder,
                         mainViewModel.ft8TransmitSignal,
+                        initialConfig = mode.toConfig(),
+                        initialAfc = mode.afc,
+                        initialNet = mode.net,
                     )
                 }
                 androidx.compose.runtime.LaunchedEffect(Unit) { rttyEngine.start() }
@@ -201,7 +208,13 @@ class ComposeMainActivity : AppCompatActivity() {
                             onSplashComplete = { showSplash = false }
                         )
                     } else {
-                        radio.ks3ckc.ft8af.ui.rtty.RttyafApp(rttyEngine, spotService) { GeneralVariables.myCallsign ?: "" }
+                        radio.ks3ckc.ft8af.ui.rtty.RttyafApp(
+                            engine = rttyEngine,
+                            spots = spotService,
+                            callsignProvider = { GeneralVariables.myCallsign ?: "" },
+                            store = rttyStore,
+                            mainViewModel = mainViewModel,
+                        )
                     }
                 }
 

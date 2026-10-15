@@ -25,6 +25,12 @@ import com.k1af.ft8af.wave.HamRecorder
 class RttyEngine(
     private val hamRecorder: HamRecorder?,
     private val transmitSignal: FT8TransmitSignal? = null,
+    /** Modem parameters to start with — normally the operator's saved [RttyModePrefs]. */
+    initialConfig: RttyConfig = RttyConfig(),
+    /** Whether AFC is engaged at start (off by default: the tones stay put until the operator opts in). */
+    initialAfc: Boolean = false,
+    /** Whether TX follows RX tuning at start. */
+    initialNet: Boolean = true,
 ) {
 
     // Stable fallback so [transmittingLive] is non-null (and safe to observe
@@ -36,7 +42,7 @@ class RttyEngine(
     val transmittingLive: LiveData<Boolean>
         get() = transmitSignal?.mutableIsRttyTransmitting ?: noTxState
 
-    var config by mutableStateOf(RttyConfig())
+    var config by mutableStateOf(initialConfig)
         private set
 
     /** Rolling decoded text (capped at [MAX_RX] chars). */
@@ -67,7 +73,7 @@ class RttyEngine(
     var listening by mutableStateOf(false)
         private set
 
-    private var afcState by mutableStateOf(true)
+    private var afcState by mutableStateOf(initialAfc)
 
     /** Automatic frequency control: track the tuned signal's drift (see [AfcTracker]). */
     var afc: Boolean
@@ -79,7 +85,7 @@ class RttyEngine(
         }
 
     /** Tuning net toggle (TX follows RX tones; display only for now). */
-    var net by mutableStateOf(true)
+    var net by mutableStateOf(initialNet)
 
     private var decoder = RttyDecoder(config)
     private var monitor: HamRecorder.VoiceDataMonitor? = null
@@ -222,14 +228,22 @@ class RttyEngine(
         transmitSignal?.stopRttyTx()
     }
 
-    /** Swap demod parameters (baud/shift/tones); rebuilds the decoder in place. */
-    fun applyConfig(newConfig: RttyConfig) {
+    /**
+     * Swap demod parameters (baud/shift/tones); rebuilds the decoder in place.
+     *
+     * @param keepTune keep the *live* mark frequency (AFC / tap-to-tune) instead
+     *   of jumping to [newConfig]'s mark — for edits that don't touch the tone
+     *   pair (squelch, USOS, baud…), so changing squelch to copy a weak station
+     *   doesn't lose the station. The AFC anchor is left alone too.
+     */
+    fun applyConfig(newConfig: RttyConfig, keepTune: Boolean = false) {
         // Under audioLock so the decoder swap can't land mid-process() on the
         // audio thread. The recorder tap doesn't depend on config, so it stays.
         synchronized(audioLock) {
-            config = newConfig
-            decoder = RttyDecoder(newConfig)
-            afcTracker.anchor(newConfig.markHz)
+            val live = if (keepTune) clampMarkHz(config.markHz, newConfig.shiftHz, maxHz = DISPLAY_MAX_HZ) else newConfig.markHz
+            config = newConfig.copy(markHz = live)
+            decoder = RttyDecoder(config)
+            if (!keepTune) afcTracker.anchor(newConfig.markHz)
             scaler.reset()
             scanAverage = FloatArray(0)
             candidates = emptyList()

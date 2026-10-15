@@ -991,6 +991,21 @@ public class MainViewModel extends ViewModel {
     }
 
     /**
+     * Whether CAT may move the dial / mode right now: never while an FT8 or RTTY
+     * over is keyed, so a Settings band pick can't retune a transmitting rig.
+     * Pure decision logic, unit-tested without the Android runtime.
+     */
+    public static boolean retuneAllowed(boolean ft8Transmitting, boolean rttyTransmitting) {
+        return !ft8Transmitting && !rttyTransmitting;
+    }
+
+    /** {@link #retuneAllowed} evaluated against the live transmitter state. */
+    public boolean isRetuneAllowed() {
+        return ft8TransmitSignal == null
+                || retuneAllowed(ft8TransmitSignal.isTransmitting(), ft8TransmitSignal.isRttyTransmitting());
+    }
+
+    /**
      * Copy used to seed {@code mutableFt8MessageList} — the UI must never be
      * handed the live {@code ft8Messages} instance. Because observeAsState
      * compares structurally and every snapshot published later is content-equal
@@ -1210,6 +1225,10 @@ public class MainViewModel extends ViewModel {
             fileLog("setOperationBand: rig not connected, skipping");
             return;
         }
+        if (!isRetuneAllowed()) {
+            fileLog("setOperationBand: refused, transmitting (freq=" + GeneralVariables.band + ")");
+            return;
+        }
 
         fileLog("setOperationBand: sending USB mode, then freq=" + GeneralVariables.band
                 + " in 800ms (controlMode=" + GeneralVariables.controlMode + ")");
@@ -1220,6 +1239,11 @@ public class MainViewModel extends ViewModel {
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
+                // Re-check: an over may have started during the 800 ms delay.
+                if (!isRetuneAllowed()) {
+                    fileLog("setOperationBand: delayed freq write refused, transmitting");
+                    return;
+                }
                 fileLog("setOperationBand: setting freq=" + GeneralVariables.band
                         + " (rig.getFreq=" + baseRig.getFreq() + ")");
                 baseRig.setFreq(GeneralVariables.band);//set frequency
