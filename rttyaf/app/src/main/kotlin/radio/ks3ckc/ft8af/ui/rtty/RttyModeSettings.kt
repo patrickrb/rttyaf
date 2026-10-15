@@ -120,7 +120,7 @@ fun RttyModeSettings(state: RttyAppState, onBack: () -> Unit) {
             SettingsRow(
                 label = "Reset to standard",
                 description = "45.45 Bd · 170 Hz · 2125/2295 Hz · LSB · USOS on · squelch on",
-                onClick = { state.updateMode { RttyModePrefs() } },
+                onClick = { state.resetMode() },
             )
         }
     }
@@ -166,7 +166,7 @@ fun RttyModeSettings(state: RttyAppState, onBack: () -> Unit) {
             suffix = "Hz",
             initialValue = mode.markHz.toInt(),
             min = RttyModePrefs.MIN_MARK_HZ,
-            max = RttyModePrefs.MAX_MARK_HZ,
+            max = RttyModePrefs.maxMarkHz(mode.shiftHz).toInt(),
             onDismiss = { dialog = null },
             onSave = { hz ->
                 state.updateMode { it.copy(markHz = hz.toDouble()) }

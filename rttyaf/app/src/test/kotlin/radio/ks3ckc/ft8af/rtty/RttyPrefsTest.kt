@@ -109,6 +109,31 @@ class RttyPrefsTest {
     }
 
     @Test
+    fun maxMarkHz_shrinksWithTheShift_soBothTonesFitThePassband() {
+        assertThat(RttyModePrefs.maxMarkHz(170)).isEqualTo(2800.0)  // 2800 + 170 < 3000: the plain cap applies
+        assertThat(RttyModePrefs.maxMarkHz(425)).isEqualTo(2575.0)  // 3000 - 425
+        assertThat(RttyModePrefs.maxMarkHz(850)).isEqualTo(2150.0)  // 3000 - 850
+        assertThat(RttyModePrefs.maxMarkHz(9000)).isEqualTo(RttyModePrefs.MIN_MARK_HZ.toDouble())
+    }
+
+    @Test
+    fun normalized_clampsTheMarkForTheChosenShift_andIsIdentityWhenAlreadyValid() {
+        val wide = RttyModePrefs(markHz = 2800.0, shiftHz = 850).normalized()
+        assertThat(wide.markHz).isEqualTo(2150.0)
+        assertThat(wide.spaceHz).isEqualTo(3000.0)
+        val ok = RttyModePrefs(markHz = 2575.0, shiftHz = 425)
+        assertThat(ok.normalized()).isSameInstanceAs(ok)
+    }
+
+    @Test
+    fun fromStore_normalisesAgainstTheStoredShift() {
+        val saved = mapOf(RttyModePrefs.KEY_MARK to "2800", RttyModePrefs.KEY_SHIFT to "425")
+        val p = RttyModePrefs.fromStore { saved[it] }
+        assertThat(p.markHz).isEqualTo(2575.0)
+        assertThat(p.shiftHz).isEqualTo(425)
+    }
+
+    @Test
     fun optionLists_containTheStandardsFirst() {
         assertThat(RttyModePrefs.BAUD_OPTIONS[0]).isEqualTo(45.45)
         assertThat(RttyModePrefs.SHIFT_OPTIONS[0]).isEqualTo(170)

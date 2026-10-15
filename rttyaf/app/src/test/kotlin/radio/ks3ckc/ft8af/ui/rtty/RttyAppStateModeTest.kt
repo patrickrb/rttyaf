@@ -84,6 +84,70 @@ class RttyAppStateModeTest {
     }
 
     @Test
+    fun updateMode_nonToneEdit_keepsTheLiveTuning() {
+        // Copilot review: tune to a weak station, turn squelch off to copy it —
+        // the decoder must stay on the station, not jump back to 2125.
+        val store = InMemoryRttyPrefsStore()
+        val engine = RttyEngine(hamRecorder = null)
+        val s = state(store, engine)
+        engine.tune(1500.0)
+
+        s.updateMode { it.copy(squelch = false, unshiftOnSpace = false, baudRate = 75.0) }
+
+        assertThat(engine.config.markHz).isEqualTo(1500.0)
+        assertThat(engine.config.squelch).isFalse()
+        assertThat(engine.config.baudRate).isEqualTo(75.0)
+    }
+
+    @Test
+    fun updateMode_shiftChange_resetsToTheNominalPair() {
+        val engine = RttyEngine(hamRecorder = null)
+        val s = state(InMemoryRttyPrefsStore(), engine)
+        engine.tune(1500.0)
+        s.updateMode { it.copy(shiftHz = 200) }
+        assertThat(engine.config.markHz).isEqualTo(2125.0)
+        assertThat(engine.config.shiftHz).isEqualTo(200)
+    }
+
+    @Test
+    fun updateMode_widenShift_clampsMarkSoSpaceStaysInPassband() {
+        val store = InMemoryRttyPrefsStore(RttyModePrefs(markHz = 2800.0))
+        val engine = RttyEngine(hamRecorder = null)
+        val s = state(store, engine)
+        s.updateMode { it.copy(shiftHz = 850) }
+        assertThat(store.current.markHz).isEqualTo(2150.0)
+        assertThat(engine.config.markHz).isEqualTo(2150.0)
+        assertThat(engine.config.spaceHz).isEqualTo(3000.0)
+    }
+
+    @Test
+    fun resetMode_restoresStandardTonesEvenWhenPrefsWereAlreadyDefault() {
+        // Copilot review: with default prefs, tune away then tap Reset — the
+        // old early-return left RX at 1500/1670.
+        val store = InMemoryRttyPrefsStore()
+        val engine = RttyEngine(hamRecorder = null)
+        val s = state(store, engine)
+        engine.tune(1500.0)
+        engine.afc = true
+
+        s.resetMode()
+
+        assertThat(engine.config.markHz).isEqualTo(2125.0)
+        assertThat(engine.afc).isFalse()
+        assertThat(s.mode).isEqualTo(RttyModePrefs())
+        assertThat(store.saveCount).isEqualTo(1)
+    }
+
+    @Test
+    fun keepsTune_onlyWhenMarkAndShiftAreUntouched() {
+        val base = RttyModePrefs()
+        assertThat(keepsTune(base, base.copy(squelch = false))).isTrue()
+        assertThat(keepsTune(base, base.copy(usbSideband = true))).isTrue()
+        assertThat(keepsTune(base, base.copy(markHz = 1275.0))).isFalse()
+        assertThat(keepsTune(base, base.copy(shiftHz = 200))).isFalse()
+    }
+
+    @Test
     fun engine_startsOnTheSavedModeWhenConstructedFromPrefs() {
         val p = RttyModePrefs(baudRate = 50.0, markHz = 1275.0, afc = true, net = false)
         val engine = RttyEngine(hamRecorder = null, initialConfig = p.toConfig(), initialAfc = p.afc, initialNet = p.net)

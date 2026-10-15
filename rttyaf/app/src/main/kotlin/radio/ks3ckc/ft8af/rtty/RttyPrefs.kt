@@ -40,6 +40,18 @@ data class RttyModePrefs(
     /** Nominal SPACE tone. */
     val spaceHz: Double get() = markHz + shiftHz
 
+    /**
+     * The same settings with the mark tone clamped so that *both* tones fit the
+     * passband for the chosen shift (see [maxMarkHz]). Applied on load and on
+     * every edit so a wide shift can never push the space tone past the
+     * waterfall / decoder range, which would otherwise make the next tune or
+     * nudge silently drag the pair down.
+     */
+    fun normalized(): RttyModePrefs {
+        val clamped = markHz.coerceIn(MIN_MARK_HZ.toDouble(), maxMarkHz(shiftHz))
+        return if (clamped == markHz) this else copy(markHz = clamped)
+    }
+
     /** Build the modem config these settings describe (12 kHz RX rate). */
     fun toConfig(sampleRate: Int = DEFAULT_SAMPLE_RATE): RttyConfig = RttyConfig(
         baudRate = baudRate,
@@ -88,6 +100,10 @@ data class RttyModePrefs(
         const val MIN_MARK_HZ = 500
         const val MAX_MARK_HZ = 2800
 
+        /** Highest mark tone that keeps `mark + shift` inside the passband ([RttyEngine.DISPLAY_MAX_HZ]). */
+        fun maxMarkHz(shiftHz: Int): Double =
+            minOf(MAX_MARK_HZ.toDouble(), RttyEngine.DISPLAY_MAX_HZ - shiftHz).coerceAtLeast(MIN_MARK_HZ.toDouble())
+
         /**
          * Rebuild from a key-value store, falling back to the default for any
          * missing or unparseable value so a corrupt/partial store never crashes
@@ -98,8 +114,7 @@ data class RttyModePrefs(
             val d = RttyModePrefs()
             val baud = get(KEY_BAUD)?.toDoubleOrNull()?.takeIf { it > 0.0 } ?: d.baudRate
             val shift = get(KEY_SHIFT)?.toIntOrNull()?.takeIf { it > 0 } ?: d.shiftHz
-            val mark = get(KEY_MARK)?.toDoubleOrNull()
-                ?.coerceIn(MIN_MARK_HZ.toDouble(), MAX_MARK_HZ.toDouble()) ?: d.markHz
+            val mark = get(KEY_MARK)?.toDoubleOrNull() ?: d.markHz
             return RttyModePrefs(
                 baudRate = baud,
                 shiftHz = shift,
@@ -109,7 +124,7 @@ data class RttyModePrefs(
                 squelch = get(KEY_SQUELCH)?.toBooleanStrictOrNull() ?: d.squelch,
                 afc = get(KEY_AFC)?.toBooleanStrictOrNull() ?: d.afc,
                 net = get(KEY_NET)?.toBooleanStrictOrNull() ?: d.net,
-            )
+            ).normalized()
         }
     }
 }
