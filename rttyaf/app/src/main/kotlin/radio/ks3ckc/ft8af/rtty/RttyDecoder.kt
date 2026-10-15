@@ -88,6 +88,13 @@ class RttyDecoder(
     private var figures = false
 
     /**
+     * Optional XY tuning-scope sink. When set, every input sample pushes the
+     * reconstructed narrow-band MARK filter output (x) and SPACE filter output
+     * (y) — see [XyTrace] for what the resulting figure means.
+     */
+    var xyTrace: XyTrace? = null
+
+    /**
      * Move the mark/space tone pair to [newMarkHz] (lower tone; the shift is
      * kept) **without** discarding filter, slicer or framing state. Tap-to-tune
      * and AFC use this so a retune mid-character costs at most that character,
@@ -171,6 +178,13 @@ class RttyDecoder(
         qMark += (1 - lpAlpha) * (x * ms - qMark)
         iSpace += (1 - lpAlpha) * (x * sc - iSpace)
         qSpace += (1 - lpAlpha) * (x * ss - qSpace)
+
+        // Band-limited tone signals rebuilt from the I/Q detectors (each is
+        // x/2 at its tone, hence the 2x): the raw material of the XY scope.
+        xyTrace?.push(
+            (2.0 * (iMark * mc + qMark * ms)).toFloat(),
+            (2.0 * (iSpace * sc + qSpace * ss)).toFloat(),
+        )
 
         val markMag = iMark * iMark + qMark * qMark
         val spaceMag = iSpace * iSpace + qSpace * qSpace

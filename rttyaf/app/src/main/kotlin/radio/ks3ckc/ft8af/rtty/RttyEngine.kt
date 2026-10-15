@@ -45,6 +45,21 @@ class RttyEngine(
     var config by mutableStateOf(initialConfig)
         private set
 
+    /**
+     * The nominal MARK tone from the operator's settings — the pair AFC and
+     * tap-to-tune drift *around*. [config] carries the live tuning; this is
+     * what [resetTune] returns to and what TX uses when [net] is off.
+     */
+    var nominalMarkHz by mutableStateOf(initialConfig.markHz)
+        private set
+
+    /** How far the live tuning has moved from the nominal pair (0 when on the saved tones). */
+    val tuneOffsetHz: Double get() = config.markHz - nominalMarkHz
+
+    /** Latest XY tuning-scope trace, interleaved x,y (see [XyTrace]); empty until audio flows. */
+    var xyPoints by mutableStateOf(FloatArray(0))
+        private set
+
     /** Rolling decoded text (capped at [MAX_RX] chars). */
     var rxText by mutableStateOf("")
         private set
@@ -84,10 +99,15 @@ class RttyEngine(
             if (value) synchronized(audioLock) { afcTracker.anchor(config.markHz) }
         }
 
-    /** Tuning net toggle (TX follows RX tones; display only for now). */
+    /**
+     * NET: transmit on the tones currently being *received* (after AFC /
+     * tap-to-tune) so a reply lands on the other station. Off, TX stays on the
+     * nominal pair regardless of where RX has been tuned — see [txConfigFor].
+     */
     var net by mutableStateOf(initialNet)
 
-    private var decoder = RttyDecoder(config)
+    private val xyTrace = XyTrace()
+    private var decoder = newDecoder(config)
     private var monitor: HamRecorder.VoiceDataMonitor? = null
     private val fft = SimpleFft(FFT_SIZE)
     private val scaler = WaterfallScaler()
@@ -112,11 +132,14 @@ class RttyEngine(
     // place instead of allocating two full-length strings on the audio thread.
     private val rxBuffer = StringBuilder()
 
+    /** A decoder for [cfg] wired to the scope trace. */
+    private fun newDecoder(cfg: RttyConfig): RttyDecoder = RttyDecoder(cfg).also { it.xyTrace = xyTrace }
+
     /** Begin continuous RX: tap the recorder and decode every chunk. Idempotent. */
     fun start() {
         if (listening) return
         val hr = hamRecorder ?: return
-        decoder = RttyDecoder(config)
+        decoder = newDecoder(config)
         monitor = hr.getVoiceData(CHUNK_MS, false) { data -> onAudio(data) }
         listening = true
     }
@@ -137,6 +160,7 @@ class RttyEngine(
             val decoded = decoder.process(chunk)
             if (decoded.isNotEmpty()) appendRx(decoded)
             analyse(chunk)
+            xyPoints = xyTrace.snapshot()
         }
     }
 
@@ -182,6 +206,9 @@ class RttyEngine(
     /** Fine-tune: move the tone pair by [deltaHz] (drag on the waterfall cursor). */
     fun nudge(deltaHz: Double) = tune(config.markHz + deltaHz)
 
+    /** Snap the tuning back to the nominal pair from Settings (undoes AFC / tap-to-tune). */
+    fun resetTune() = tune(nominalMarkHz)
+
     /** Retune the live decoder without rebuilding it. Callers hold [audioLock]. */
     private fun setMark(markHz: Double) {
         if (markHz == config.markHz) return
@@ -219,7 +246,8 @@ class RttyEngine(
         val msg = text.trim()
         if (msg.isEmpty()) return false
         val rate = txSampleRate(GeneralVariables.audioSampleRate, config.sampleRate)
-        val pcm = RttyEncoder(config.copy(sampleRate = rate)).encode(txMessage(msg))
+        val txCfg = txConfigFor(config, nominalMarkHz, net).copy(sampleRate = rate)
+        val pcm = RttyEncoder(txCfg).encode(txMessage(msg))
         return tx.transmitRtty(pcm, rate)
     }
 
@@ -242,7 +270,11 @@ class RttyEngine(
         synchronized(audioLock) {
             val live = if (keepTune) clampMarkHz(config.markHz, newConfig.shiftHz, maxHz = DISPLAY_MAX_HZ) else newConfig.markHz
             config = newConfig.copy(markHz = live)
-            decoder = RttyDecoder(config)
+            // The nominal pair is what Settings asked for, even when the live
+            // tuning is being kept.
+            nominalMarkHz = newConfig.markHz
+            decoder = newDecoder(config)
+            xyTrace.clear()
             if (!keepTune) afcTracker.anchor(newConfig.markHz)
             scaler.reset()
             scanAverage = FloatArray(0)
@@ -272,6 +304,7 @@ class RttyEngine(
                 analyse(samples.copyOfRange(i, minOf(i + chunk, samples.size)))
                 i += chunk
             }
+            xyPoints = xyTrace.snapshot()
         }
     }
 
@@ -301,6 +334,15 @@ internal fun blendColumn(average: FloatArray, column: FloatArray, alpha: Float):
     for (i in column.indices) out[i] = average[i] + alpha * (column[i] - average[i])
     return out
 }
+
+/**
+ * The modem config an over is modulated with. NET on: the live [config], so TX
+ * follows wherever RX is tuned (reply on the other station's tones). NET off:
+ * the nominal pair from Settings, whatever AFC or a tap did to RX. Pure —
+ * unit-tested.
+ */
+internal fun txConfigFor(config: RttyConfig, nominalMarkHz: Double, net: Boolean): RttyConfig =
+    if (net) config else config.copy(markHz = nominalMarkHz)
 
 /**
  * Wrap outgoing operator text as an RTTY over: a leading idle space (gives the

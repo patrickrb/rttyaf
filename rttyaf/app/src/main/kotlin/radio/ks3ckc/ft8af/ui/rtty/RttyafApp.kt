@@ -131,6 +131,8 @@ class RttyAppState(
     /** The worked station's exchange, typed on Operate and stored with the QSO. */
     var rcvdExchange by mutableStateOf("")
     var txPreview by mutableStateOf("")
+    /** Whether the XY tuning scope is shown beside the waterfall. */
+    var showXyScope by mutableStateOf(true)
 
     val macros = mutableStateListOf(
         RttyMacro("CQ", "F1", "CQ CQ DE {MYCALL} {MYCALL} CQ K"),
