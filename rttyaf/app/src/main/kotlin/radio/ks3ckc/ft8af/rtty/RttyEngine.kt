@@ -256,16 +256,26 @@ class RttyEngine(
         transmitSignal?.stopRttyTx()
     }
 
-    /** Swap demod parameters (baud/shift/tones); rebuilds the decoder in place. */
-    fun applyConfig(newConfig: RttyConfig) {
+    /**
+     * Swap demod parameters (baud/shift/tones); rebuilds the decoder in place.
+     *
+     * @param keepTune keep the *live* mark frequency (AFC / tap-to-tune) instead
+     *   of jumping to [newConfig]'s mark — for edits that don't touch the tone
+     *   pair (squelch, USOS, baud…), so changing squelch to copy a weak station
+     *   doesn't lose the station. The AFC anchor is left alone too.
+     */
+    fun applyConfig(newConfig: RttyConfig, keepTune: Boolean = false) {
         // Under audioLock so the decoder swap can't land mid-process() on the
         // audio thread. The recorder tap doesn't depend on config, so it stays.
         synchronized(audioLock) {
-            config = newConfig
+            val live = if (keepTune) clampMarkHz(config.markHz, newConfig.shiftHz, maxHz = DISPLAY_MAX_HZ) else newConfig.markHz
+            config = newConfig.copy(markHz = live)
+            // The nominal pair is what Settings asked for, even when the live
+            // tuning is being kept.
             nominalMarkHz = newConfig.markHz
-            decoder = newDecoder(newConfig)
+            decoder = newDecoder(config)
             xyTrace.clear()
-            afcTracker.anchor(newConfig.markHz)
+            if (!keepTune) afcTracker.anchor(newConfig.markHz)
             scaler.reset()
             scanAverage = FloatArray(0)
             candidates = emptyList()

@@ -69,20 +69,39 @@ class RttyAppState(
         private set
 
     /**
-     * Change the mode settings: persist, then apply to the live modem. Tone
-     * changes retune the decoder to the new nominal pair (dropping any AFC /
-     * tap-to-tune offset) — that is what an operator who just changed the
-     * tones expects.
+     * Change the mode settings: persist, then apply to the live modem. A change
+     * to the tone pair (mark or shift) retunes the decoder to the new nominal
+     * pair, dropping any AFC / tap-to-tune offset — that is what an operator
+     * who just changed the tones expects. Any other edit (squelch, USOS, baud,
+     * sideband) keeps the live tuning so a station being copied isn't lost.
+     * The result is normalised so mark + shift always fits the passband.
      */
     fun updateMode(transform: (RttyModePrefs) -> RttyModePrefs) {
         val prev = mode
-        val next = transform(prev)
+        val next = transform(prev).normalized()
         if (next == prev) return
         mode = next
         store.save(next)
-        if (next.toConfig() != prev.toConfig()) engine.applyConfig(next.toConfig())
+        if (next.toConfig() != prev.toConfig()) {
+            engine.applyConfig(next.toConfig(), keepTune = keepsTune(prev, next))
+        }
         engine.afc = next.afc
         engine.net = next.net
+    }
+
+    /**
+     * Back to the standard settings *and* the standard tones. Unlike
+     * [updateMode] this always re-applies the config, so tapping Reset after
+     * tuning around the waterfall returns RX to 2125/2295 even when the saved
+     * preferences were already the defaults.
+     */
+    fun resetMode() {
+        val defaults = RttyModePrefs()
+        mode = defaults
+        store.save(defaults)
+        engine.applyConfig(defaults.toConfig())
+        engine.afc = defaults.afc
+        engine.net = defaults.net
     }
 
     /** Toggle AFC (Operate-screen chip or Settings) and remember the choice. */
@@ -146,6 +165,10 @@ class RttyAppState(
         .replace("{EXCH}", myExchange)
         .replace("{SERIAL}", serial.toString().padStart(3, '0'))
 }
+
+/** Whether an edit from [prev] to [next] leaves the tone pair alone (so live tuning should be kept). */
+internal fun keepsTune(prev: RttyModePrefs, next: RttyModePrefs): Boolean =
+    prev.markHz == next.markHz && prev.shiftHz == next.shiftHz
 
 enum class RttyTab { OPERATE, CONTEST, MACROS, LOG, SETTINGS }
 

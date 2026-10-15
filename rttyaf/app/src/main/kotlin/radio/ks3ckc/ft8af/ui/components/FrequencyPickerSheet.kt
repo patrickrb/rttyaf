@@ -42,6 +42,12 @@ import radio.ks3ckc.ft8af.theme.*
  * Shared between the Settings band picker and the TxStrip frequency picker.
  */
 fun selectBandIndex(mainViewModel: MainViewModel, context: Context, index: Int) {
+    // Never move a keyed rig: Settings stays reachable during an FT8/RTTY over,
+    // so refuse here (before any state changes) like MainViewModel.qsyTo does.
+    if (!mainViewModel.isRetuneAllowed) {
+        com.k1af.ft8af.ui.ToastMessage.show(context.getString(com.k1af.ft8af.R.string.band_change_refused_transmitting))
+        return
+    }
     // Compare the meter (wavelength) band, not the index — see shouldClearOnBandChange.
     val oldWaveLength = BaseRigOperation.getMeterFromFreq(GeneralVariables.band)
     GeneralVariables.bandListIndex = index
