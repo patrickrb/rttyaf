@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -153,10 +154,19 @@ fun OperateScreen(state: RttyAppState) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Tapping the readout snaps back to the nominal pair from Settings
+                // (undoing AFC / tap-to-tune); the ↺ shows while it's off nominal.
+                val offNominal = showTuneReset(engine.tuneOffsetHz)
+                Row(
+                    Modifier.clickable(enabled = offNominal) { engine.resetTune() },
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text("MARK ${cfg.markToneHz.toInt()}", color = Signal, fontSize = 11.sp, fontFamily = GeistMonoFamily)
                     Text("SPACE ${cfg.spaceToneHz.toInt()}", color = Accent, fontSize = 11.sp, fontFamily = GeistMonoFamily)
-                    if (hasCandidates) {
+                    if (offNominal) {
+                        Text("↺ ${engine.nominalMarkHz.toInt()}", color = TextMuted, fontSize = 11.sp, fontFamily = GeistMonoFamily)
+                    } else if (hasCandidates) {
                         Text("${engine.candidates.size} SIG", color = TextMuted, fontSize = 11.sp, fontFamily = GeistMonoFamily)
                     }
                 }
@@ -164,13 +174,19 @@ fun OperateScreen(state: RttyAppState) {
                     // Persisted via the app state so the choice survives a restart.
                     MiniToggle("AFC", engine.afc) { state.setAfc(!engine.afc) }
                     MiniToggle("NET", engine.net) { state.setNet(!engine.net) }
+                    MiniToggle("XY", state.showXyScope) { state.showXyScope = !state.showXyScope }
                 }
             }
-            Waterfall(
-                engine, Modifier.fillMaxWidth().height(160.dp),
-                tags = waterfallTags(spots.spots, spots.dialHz),
-                onTagTap = { tag -> spots.go(tag.spot) },
-            )
+            Row(Modifier.fillMaxWidth().height(160.dp)) {
+                Waterfall(
+                    engine, Modifier.weight(1f).fillMaxHeight(),
+                    tags = waterfallTags(spots.spots, spots.dialHz),
+                    onTagTap = { tag -> spots.go(tag.spot) },
+                )
+                if (state.showXyScope) {
+                    XyScope(engine, Modifier.width(XY_SCOPE_WIDTH).fillMaxHeight())
+                }
+            }
         }
 
         // ---- RX + TX panes ----
@@ -485,6 +501,38 @@ private fun Waterfall(
     }
 }
 
+/**
+ * The XY tuning scope: MARK filter output on X, SPACE filter output on Y (see
+ * [radio.ks3ckc.ft8af.rtty.XyTrace]). A tuned signal draws a symmetric cross;
+ * off-frequency, one arm collapses. Auto-gained so weak and strong signals
+ * draw the same size — only the *shape* carries information.
+ */
+@Composable
+private fun XyScope(engine: radio.ks3ckc.ft8af.rtty.RttyEngine, modifier: Modifier) {
+    val points = radio.ks3ckc.ft8af.rtty.normalizeXy(engine.xyPoints)
+    Box(modifier.padding(start = 6.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val geo = XyScopeGeometry(size.width, size.height)
+            drawRect(BgApp.copy(alpha = 0.6f), Offset(geo.cx - geo.r, geo.cy - geo.r), Size(2 * geo.r, 2 * geo.r))
+            // Faint axes: the targets the arms should lie along.
+            drawLine(Border, Offset(geo.cx - geo.r, geo.cy), Offset(geo.cx + geo.r, geo.cy), 1f)
+            drawLine(Border, Offset(geo.cx, geo.cy - geo.r), Offset(geo.cx, geo.cy + geo.r), 1f)
+            var i = 0
+            var prev: Offset? = null
+            while (i + 1 < points.size) {
+                val p = geo.toCanvas(points[i], points[i + 1])
+                prev?.let { drawLine(Signal.copy(alpha = 0.55f), it, p, 1.2f) }
+                prev = p
+                i += 2
+            }
+        }
+        Text(
+            "XY", color = TextFaint, fontSize = 9.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.TopEnd).padding(end = 4.dp, top = 2.dp),
+        )
+    }
+}
+
 @Composable
 private fun Chip(text: String, dot: Color, bg: Color, fg: Color, border: Boolean) {
     Row(
@@ -571,3 +619,21 @@ private fun utcNow(): String {
 private fun trimNum(d: Double): String = if (d == d.toLong().toDouble()) d.toLong().toString() else d.toString()
 
 private const val MAX_ROWS = 100
+
+/** Width of the XY scope panel beside the waterfall. */
+private val XY_SCOPE_WIDTH = 112.dp
+
+/** Show the ↺ reset affordance once the live tuning is off the nominal pair by at least 1 Hz. */
+internal fun showTuneReset(offsetHz: Double): Boolean = abs(offsetHz) >= 1.0
+
+/**
+ * Maps a normalised XY trace (±1 on each axis) onto a square centred in a
+ * canvas of [width] × [height], with a small inset so the arms don't touch
+ * the edge. Y is flipped so +space draws upward. Pure — unit-tested.
+ */
+internal class XyScopeGeometry(width: Float, height: Float, inset: Float = 3f) {
+    val cx: Float = width / 2f
+    val cy: Float = height / 2f
+    val r: Float = (minOf(width, height) / 2f - inset).coerceAtLeast(1f)
+    fun toCanvas(x: Float, y: Float): Offset = Offset(cx + x * r, cy - y * r)
+}

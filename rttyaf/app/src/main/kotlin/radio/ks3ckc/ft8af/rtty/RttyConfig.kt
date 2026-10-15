@@ -3,18 +3,20 @@ package radio.ks3ckc.ft8af.rtty
 /**
  * Parameters shared by [RttyEncoder] and [RttyDecoder].
  *
- * Frequency convention (upper-sideband, the amateur norm): the **MARK** tone
- * (logical 1 — start-of-idle, stop bit, and set data bits) is the *lower* audio
- * frequency [markHz]; the **SPACE** tone (logical 0 — start bit and cleared
- * data bits) sits [shiftHz] above it. [reverse] swaps the two audio tones for
- * lower-sideband or reversed-polarity links without changing the bit logic.
+ * Frequency convention: on the air, **MARK** (logical 1 — idle, stop bit, set
+ * data bits) is the *higher* RF frequency and **SPACE** (logical 0 — start bit,
+ * cleared data bits) the lower. AFSK RTTY is run with the rig in **LSB**, which
+ * inverts the audio: mark becomes the *lower* audio tone [markHz] (2125 Hz with
+ * the standard "high tones") and space sits [shiftHz] above it (2295 Hz). That
+ * is the convention here. [reverse] swaps the two audio tones for a rig run in
+ * USB (or a reversed-polarity link) without changing the bit logic.
  *
  * @param baudRate        symbol rate (45.45 is the classic US amateur speed)
  * @param shiftHz         mark→space frequency separation (170 Hz standard)
  * @param markHz          mark audio frequency in Hz (2125 = "high tones")
  * @param sampleRate      audio sample rate in Hz
  * @param stopBits        stop-bit length in bit periods (1.5 is standard)
- * @param reverse         swap which audio tone represents mark vs. space
+ * @param reverse         swap which audio tone represents mark vs. space (rig in USB)
  * @param unshiftOnSpace  USOS: a decoded SPACE reverts the shift to LETTERS
  * @param squelch         gate the decoder on tone energy so an idle/noisy
  *                        channel doesn't print random characters
