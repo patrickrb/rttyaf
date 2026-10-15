@@ -101,6 +101,21 @@ class XyScopeTest {
     }
 
     @Test
+    fun defaultTraceSettings_keepTheTopOfThePassbandVisible() {
+        // Copilot review: with decimate 4 the point rate was 3 kHz, so a 3000 Hz
+        // SPACE tone landed on one fixed phase and its arm vanished. The highest
+        // pair Settings allows (2830/3000 with a 170 Hz shift) must still cross.
+        val cfg = RttyConfig(markHz = 2830.0)
+        val trace = XyTrace() // defaults, as the engine uses them
+        val dec = RttyDecoder(cfg).also { it.xyTrace = trace }
+        dec.process(RttyEncoder(cfg).encode(text))
+        val arms = xyArms(trace.snapshot())
+        assertThat(arms.mark).isGreaterThan(0.35f)
+        assertThat(arms.space).isGreaterThan(0.35f)
+        assertThat(trace.size).isEqualTo(XyTrace.DEFAULT_CAPACITY)
+    }
+
+    @Test
     fun noTraceAttached_decoderStillDecodes() {
         val cfg = RttyConfig()
         val dec = RttyDecoder(cfg)

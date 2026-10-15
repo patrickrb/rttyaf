@@ -35,6 +35,34 @@ class RttyEngineTuneTest {
     }
 
     @Test
+    fun resetTune_returnsExactlyToACustomPairAtTheTopOfThePassband() {
+        // Copilot review: a saved pair whose space tone sits at the passband
+        // edge must come back exactly, not one clamp step lower. Settings
+        // normalises mark + shift <= DISPLAY_MAX_HZ (RttyModePrefs.normalized),
+        // so the highest legal 425 Hz pair is 2575/3000.
+        val nominal = RttyModePrefs(markHz = 2575.0, shiftHz = 425).normalized()
+        assertThat(nominal.markHz).isEqualTo(2575.0)
+        val engine = RttyEngine(hamRecorder = null, initialConfig = nominal.toConfig())
+        engine.tune(1500.0)
+        engine.resetTune()
+        assertThat(engine.config.markHz).isEqualTo(2575.0)
+        assertThat(engine.tuneOffsetHz).isEqualTo(0.0)
+        // And an out-of-range request is normalised *before* it ever becomes nominal.
+        assertThat(RttyModePrefs(markHz = 2800.0, shiftHz = 425).normalized().markHz).isEqualTo(2575.0)
+    }
+
+    @Test
+    fun applyConfig_keepTune_updatesNominalButLeavesLiveTuningAlone() {
+        val engine = RttyEngine(hamRecorder = null)
+        engine.tune(1500.0)
+        engine.applyConfig(RttyConfig(squelch = false), keepTune = true)
+        assertThat(engine.config.markHz).isEqualTo(1500.0)
+        assertThat(engine.config.squelch).isFalse()
+        assertThat(engine.nominalMarkHz).isEqualTo(2125.0)
+        assertThat(engine.tuneOffsetHz).isEqualTo(-625.0)
+    }
+
+    @Test
     fun txConfigFor_netOnFollowsRx_netOffUsesNominal() {
         val live = RttyConfig(markHz = 1500.0, shiftHz = 170)
         assertThat(txConfigFor(live, nominalMarkHz = 2125.0, net = true)).isEqualTo(live)

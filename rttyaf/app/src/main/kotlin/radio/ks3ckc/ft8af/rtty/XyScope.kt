@@ -14,9 +14,11 @@ import kotlin.math.max
  * disappears; a signal with the wrong shift lights only one arm. Operators
  * read this at a glance far faster than a waterfall.
  *
- * [XyTrace] is the ring buffer the demodulator fills (one point per
- * [decimate] input samples); [normalizeXy] auto-gains a snapshot for display
- * and [xyArms] measures the two arms for tests and any future "tuned" cue.
+ * [XyTrace] is the ring buffer the demodulator fills (every input sample by
+ * default — decimating would alias: at a 3 kHz point rate a 3000 Hz space tone
+ * is sampled at one fixed phase and its arm collapses to a dot even when
+ * perfectly tuned); [normalizeXy] auto-gains a snapshot for display and
+ * [xyArms] measures the two arms for tests and any future "tuned" cue.
  */
 class XyTrace(val capacity: Int = DEFAULT_CAPACITY, val decimate: Int = DEFAULT_DECIMATE) {
     init {
@@ -61,9 +63,11 @@ class XyTrace(val capacity: Int = DEFAULT_CAPACITY, val decimate: Int = DEFAULT_
     }
 
     companion object {
-        /** ~170 ms of trace at 12 kHz / decimate 4 — a few characters' worth. */
-        const val DEFAULT_CAPACITY = 512
-        const val DEFAULT_DECIMATE = 4
+        /** ~170 ms of trace at 12 kHz — a few characters' worth. */
+        const val DEFAULT_CAPACITY = 2048
+
+        /** Keep every sample: any decimation puts a tone at `rate / decimate / 2` or its multiples on a fixed phase. */
+        const val DEFAULT_DECIMATE = 1
     }
 }
 
