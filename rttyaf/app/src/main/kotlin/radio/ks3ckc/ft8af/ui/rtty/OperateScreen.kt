@@ -161,8 +161,9 @@ fun OperateScreen(state: RttyAppState) {
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MiniToggle("AFC", engine.afc) { engine.afc = !engine.afc }
-                    MiniToggle("NET", engine.net) { engine.net = !engine.net }
+                    // Persisted via the app state so the choice survives a restart.
+                    MiniToggle("AFC", engine.afc) { state.setAfc(!engine.afc) }
+                    MiniToggle("NET", engine.net) { state.setNet(!engine.net) }
                 }
             }
             Waterfall(

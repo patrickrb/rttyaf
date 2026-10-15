@@ -64,10 +64,8 @@ import radio.ks3ckc.ft8af.ui.components.TopBar
  * a focused detail screen via drill-down navigation.
  */
 private enum class SettingsCategory {
+    RTTY_MODE,
     RADIO_AUDIO,
-    TRANSMISSION,
-    TIME_SYNC,
-    DECODE_FILTERS,
     LOGGING,
     ADVANCED,
     ABOUT,
@@ -105,6 +103,10 @@ internal fun resolveRigDisplayName(
 fun SettingsScreen(
     mainViewModel: MainViewModel,
     modifier: Modifier = Modifier,
+    /** One-line summary of the RTTY mode settings for the landing row (e.g. "45.45 Bd · 170 Hz · 2125/2295 · LSB"). */
+    rttyModeSummary: String? = null,
+    /** The RTTY Mode detail screen; receives the back action. The row is hidden when null. */
+    rttyModeContent: (@Composable (onBack: () -> Unit) -> Unit)? = null,
 ) {
     var currentCategory by remember { mutableStateOf<SettingsCategory?>(null) }
 
@@ -129,16 +131,15 @@ fun SettingsScreen(
         when (category) {
             null -> SettingsLanding(
                 mainViewModel = mainViewModel,
+                rttyModeSummary = if (rttyModeContent != null) rttyModeSummary.orEmpty() else null,
                 onOpenCategory = { currentCategory = it },
             )
+            SettingsCategory.RTTY_MODE ->
+                // The row only shows when content was supplied, so this is reachable
+                // only with non-null content; the fallback just returns to the landing.
+                rttyModeContent?.invoke { currentCategory = null } ?: run { currentCategory = null }
             SettingsCategory.RADIO_AUDIO ->
                 RadioAudioSettings(mainViewModel, onBack = { currentCategory = null })
-            SettingsCategory.TRANSMISSION ->
-                TransmissionSettings(mainViewModel, onBack = { currentCategory = null })
-            SettingsCategory.TIME_SYNC ->
-                TimeSyncSettings(mainViewModel, onBack = { currentCategory = null })
-            SettingsCategory.DECODE_FILTERS ->
-                DecodeFilterSettings(mainViewModel, onBack = { currentCategory = null })
             SettingsCategory.LOGGING ->
                 LoggingSettings(mainViewModel, onBack = { currentCategory = null })
             SettingsCategory.ADVANCED ->
@@ -156,6 +157,8 @@ fun SettingsScreen(
 @Composable
 private fun SettingsLanding(
     mainViewModel: MainViewModel,
+    /** Summary for the RTTY Mode row; null hides the row (FT8-only hosts). */
+    rttyModeSummary: String?,
     onOpenCategory: (SettingsCategory) -> Unit,
 ) {
     val context = LocalContext.current
@@ -289,29 +292,19 @@ private fun SettingsLanding(
             // =====================================================================
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column {
+                    if (rttyModeSummary != null) {
+                        SettingsRow(
+                            label = "RTTY Mode",
+                            description = rttyModeSummary.ifBlank { null },
+                            showChevron = true,
+                            onClick = { onOpenCategory(SettingsCategory.RTTY_MODE) },
+                        )
+                        SectionDivider()
+                    }
                     SettingsRow(
                         label = stringResource(R.string.settings_cat_radio_audio),
                         showChevron = true,
                         onClick = { onOpenCategory(SettingsCategory.RADIO_AUDIO) },
-                    )
-                    SectionDivider()
-                    SettingsRow(
-                        label = stringResource(R.string.settings_cat_transmission),
-                        showChevron = true,
-                        onClick = { onOpenCategory(SettingsCategory.TRANSMISSION) },
-                    )
-                    SectionDivider()
-                    SettingsRow(
-                        label = stringResource(R.string.settings_cat_time_sync),
-                        description = stringResource(R.string.settings_cat_time_sync_desc),
-                        showChevron = true,
-                        onClick = { onOpenCategory(SettingsCategory.TIME_SYNC) },
-                    )
-                    SectionDivider()
-                    SettingsRow(
-                        label = stringResource(R.string.settings_cat_decode_filters),
-                        showChevron = true,
-                        onClick = { onOpenCategory(SettingsCategory.DECODE_FILTERS) },
                     )
                     SectionDivider()
                     SettingsRow(

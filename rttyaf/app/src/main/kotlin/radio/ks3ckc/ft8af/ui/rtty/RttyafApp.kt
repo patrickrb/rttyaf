@@ -21,7 +21,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.k1af.ft8af.MainViewModel
+import radio.ks3ckc.ft8af.rtty.InMemoryRttyPrefsStore
 import radio.ks3ckc.ft8af.rtty.RttyEngine
+import radio.ks3ckc.ft8af.rtty.RttyModePrefs
+import radio.ks3ckc.ft8af.rtty.RttyPrefsStore
 import radio.ks3ckc.ft8af.rtty.spots.SpotService
 import radio.ks3ckc.ft8af.rtty.spots.formatDialLabel
 import radio.ks3ckc.ft8af.rtty.spots.RttySegments
@@ -51,7 +55,54 @@ data class RttyMacro(val name: String, val key: String, val text: String)
  * operator entry, macro set and in-memory log. Held once by [RttyafApp] and
  * handed to each screen. Mutable Compose state so edits reflect everywhere.
  */
-class RttyAppState(val engine: RttyEngine, val spots: SpotService, private val callsignProvider: () -> String = { "" }) {
+class RttyAppState(
+    val engine: RttyEngine,
+    val spots: SpotService,
+    private val callsignProvider: () -> String = { "" },
+    /** Where the RTTY mode settings persist; in-memory unless the host supplies a real one. */
+    private val store: RttyPrefsStore = InMemoryRttyPrefsStore(),
+    /** The FT8AF-inherited view model the Radio & Audio / Logging / About settings screens drive; null in tests and previews. */
+    val mainViewModel: MainViewModel? = null,
+) {
+    /** The saved RTTY mode settings (baud/shift/tones/…); edited on Settings → RTTY Mode. */
+    var mode by mutableStateOf(store.load())
+        private set
+
+    /**
+     * Change the mode settings: persist, then apply to the live modem. Tone
+     * changes retune the decoder to the new nominal pair (dropping any AFC /
+     * tap-to-tune offset) — that is what an operator who just changed the
+     * tones expects.
+     */
+    fun updateMode(transform: (RttyModePrefs) -> RttyModePrefs) {
+        val prev = mode
+        val next = transform(prev)
+        if (next == prev) return
+        mode = next
+        store.save(next)
+        if (next.toConfig() != prev.toConfig()) engine.applyConfig(next.toConfig())
+        engine.afc = next.afc
+        engine.net = next.net
+    }
+
+    /** Toggle AFC (Operate-screen chip or Settings) and remember the choice. */
+    fun setAfc(on: Boolean) {
+        engine.afc = on
+        if (mode.afc != on) {
+            mode = mode.copy(afc = on)
+            store.save(mode)
+        }
+    }
+
+    /** Toggle NET and remember the choice. */
+    fun setNet(on: Boolean) {
+        engine.net = on
+        if (mode.net != on) {
+            mode = mode.copy(net = on)
+            store.save(mode)
+        }
+    }
+
     var call by mutableStateOf("")
     var rstSent by mutableStateOf("599")
     var rstRcvd by mutableStateOf("599")
@@ -102,8 +153,14 @@ enum class RttyTab { OPERATE, CONTEST, MACROS, LOG, SETTINGS }
  * the app shell (see ComposeMainActivity.setContent).
  */
 @Composable
-fun RttyafApp(engine: RttyEngine, spots: SpotService, callsignProvider: () -> String = { "" }) {
-    val state = remember(engine, spots) { RttyAppState(engine, spots, callsignProvider) }
+fun RttyafApp(
+    engine: RttyEngine,
+    spots: SpotService,
+    callsignProvider: () -> String = { "" },
+    store: RttyPrefsStore = InMemoryRttyPrefsStore(),
+    mainViewModel: MainViewModel? = null,
+) {
+    val state = remember(engine, spots) { RttyAppState(engine, spots, callsignProvider, store, mainViewModel) }
     var tab by rememberSaveable { mutableStateOf(RttyTab.OPERATE) }
     val insets = WindowInsets.systemBars.asPaddingValues()
 
