@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.k1af.rttyaf.R
 import radio.ks3ckc.rttyaf.theme.*
-import radio.ks3ckc.rttyaf.ui.decode.QrzAvatar
+import radio.ks3ckc.rttyaf.ui.components.QrzAvatar
 
 /**
  * Operator identity card with amber gradient background, callsign avatar,

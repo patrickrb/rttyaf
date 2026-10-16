@@ -182,10 +182,7 @@ dependencies {
 
     implementation 'com.google.guava:guava:31.1-android'//Used for HashTable (multi-key HashMap)
 
-    implementation files('src/libs/MPAndroidChartv_3.1.0.jar')
     implementation files('src/libs/commons-net-3.6.jar')////Used for time synchronization
-    implementation files('src/libs/nanohttpd-2.2.0.jar')
-    implementation files('src/libs/osmdroid-android-6.1.14.aar')//Map widget
 
     // Compose BOM — 2025.04.01 maps to Compose 1.8.0 (issue #440). activity- and
     // navigation-compose are versioned outside the BOM, so they are bumped to the

@@ -49,9 +49,6 @@ public abstract class BaseRig {
 //    public void sendWaveData(float[] data) {
 //        //reserved for ICOM rig use
 //    }
-    public void sendWaveData(Ft8Message message) {
-        //reserved for ICOM rig use
-    }
 
     public long getFreq() {
         return freq;

@@ -28,7 +28,6 @@ import com.k1af.rttyaf.R;
 import com.k1af.rttyaf.callsign.CallsignDatabase;
 import com.k1af.rttyaf.callsign.CallsignInfo;
 import com.k1af.rttyaf.connector.ConnectMode;
-import com.k1af.rttyaf.ft8signal.FT8Package;
 import com.k1af.rttyaf.log.AdifFormat;
 import com.k1af.rttyaf.log.OnQueryQSLCallsign;
 import com.k1af.rttyaf.log.OnQueryQSLRecordCallsign;
@@ -1452,13 +1451,6 @@ public class DatabaseOpr extends SQLiteOpenHelper {
             }
             return false;
         }
-        // POTA: if an activation is running, stamp MY_SIG/MY_SIG_INFO; if the worked
-        // station is currently spotted on pota.app, stamp SIG/SIG_INFO too (P2P case).
-        // No-op when no activation/spot, so non-POTA contacts are unaffected.
-        radio.ks3ckc.rttyaf.pota.PotaSessionManager.stampQso(
-                record,
-                radio.ks3ckc.rttyaf.pota.PotaSpotsRepository.parkRefFor(record.getToCallsign()));
-
         String querySQL;
         if (!checkQSLCallsign(record)) {//If record doesn't exist, add it
             querySQL = "INSERT INTO  QslCallsigns (callsign" +
@@ -2508,14 +2500,8 @@ public class DatabaseOpr extends SQLiteOpenHelper {
                     GeneralVariables.myCallsign = result;
                     String callsign = GeneralVariables.myCallsign;
                     if (callsign.length() > 0) {
-                        Ft8Message.hashList.addHash(FT8Package.getHash22(callsign), callsign);
-                        Ft8Message.hashList.addHash(FT8Package.getHash12(callsign), callsign);
-                        Ft8Message.hashList.addHash(FT8Package.getHash10(callsign), callsign);
                         if (callsign.contains("/")) {
                             String shortCallsign = GeneralVariables.getShortCallsign(callsign);
-                            Ft8Message.hashList.addHash(FT8Package.getHash22(shortCallsign), shortCallsign);
-                            Ft8Message.hashList.addHash(FT8Package.getHash12(shortCallsign), shortCallsign);
-                            Ft8Message.hashList.addHash(FT8Package.getHash10(shortCallsign), shortCallsign);
                         }
                     }
                 }

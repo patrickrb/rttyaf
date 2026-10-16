@@ -54,7 +54,6 @@ import com.k1af.rttyaf.wave.UsbAudioNative
 import com.k1af.rttyaf.log.OnShareLogEvents
 import com.k1af.rttyaf.maidenhead.MaidenheadGrid
 import com.k1af.rttyaf.ui.ToastMessage
-import radio.ks3ckc.rttyaf.pota.PotaSessionManager
 import radio.ks3ckc.rttyaf.theme.RttyafTheme
 import radio.ks3ckc.rttyaf.theme.applyTheme
 import radio.ks3ckc.rttyaf.theme.loadTheme
@@ -128,20 +127,6 @@ class ComposeMainActivity : AppCompatActivity() {
         // expect back to peel off the foreground overlay first.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val sheetCs = mainViewModel.qsoSheetCallsign.value
-                val sheetMinimized = mainViewModel.qsoSheetMinimized.value == true
-                if (sheetCs != null && !sheetMinimized) {
-                    // Mirror DecodeScreen.onDismiss: minimize when a QSO is
-                    // live so the panel header stays reopenable; fully clear
-                    // otherwise.
-                    if (mainViewModel.ft8TransmitSignal.isActivated) {
-                        mainViewModel.qsoSheetMinimized.postValue(true)
-                    } else {
-                        mainViewModel.qsoSheetCallsign.postValue(null)
-                        mainViewModel.qsoSheetMinimized.postValue(false)
-                    }
-                    return
-                }
                 showExitConfirm.value = true
             }
         })
@@ -223,7 +208,6 @@ class ComposeMainActivity : AppCompatActivity() {
                     onCancel = { showExitConfirm.value = false },
                     onConfirm = {
                         showExitConfirm.value = false
-                        mainViewModel.ft8TransmitSignal.isActivated = false
                         closeApp()
                     },
                 )
@@ -262,20 +246,6 @@ class ComposeMainActivity : AppCompatActivity() {
         }
 
         // Handle a tapped Needed-DX alert (cold start).
-        handleAlertIntent(intent)
-    }
-
-    /**
-     * If [intent] came from a tapped Needed-DX notification, publish the alerted callsign
-     * so the Decode screen can switch to itself and scroll to + highlight that station.
-     */
-    private fun handleAlertIntent(intent: Intent?) {
-        val callsign = intent?.getStringExtra(
-            com.k1af.rttyaf.alert.DxAlertNotifier.EXTRA_CALLSIGN,
-        ) ?: return
-        if (callsign.isBlank()) return
-        fileLog("handleAlertIntent: preselect $callsign")
-        mainViewModel.mutablePreselectCallsign.postValue(callsign)
     }
 
     private fun buildPermissionsList(): Array<String> {
@@ -393,15 +363,6 @@ class ComposeMainActivity : AppCompatActivity() {
                 if (GeneralVariables.disciplineClockFromGPS) {
                     GpsClockUpdater.refresh(applicationContext)
                 }
-                mainViewModel.ft8TransmitSignal.setTimer_sec(GeneralVariables.transmitDelay)
-
-                // The cycle timers were built (for FT8) before config loaded; now that the
-                // persisted operating mode is known, rebuild them for it and sync the UI.
-                mainViewModel.applyLoadedOperatingMode()
-
-                // Resume any POTA activation that was interrupted by app close
-                PotaSessionManager.resume()
-
                 // Scan for USB devices AFTER config is loaded
                 fileLog("initData: scanning USB devices")
                 mainViewModel.getUsbDevice()
@@ -442,7 +403,6 @@ class ComposeMainActivity : AppCompatActivity() {
         })
 
         DatabaseOpr.loadCallsignMapGridAsync(mainViewModel.databaseOpr.db)
-        mainViewModel.getFollowCallsignsFromDataBase()
     }
 
     private fun doReceiveShareFile(intent: Intent) {
@@ -541,8 +501,7 @@ class ComposeMainActivity : AppCompatActivity() {
             setIntent(intent)
             doReceiveShareFile(intent)
             // Handle a tapped Needed-DX alert (app already running).
-            handleAlertIntent(intent)
-        }
+            }
     }
 
     private fun registerBluetoothReceiver() {
@@ -615,7 +574,7 @@ class ComposeMainActivity : AppCompatActivity() {
         // tone and drops PTT. Normal FT8 TX is left alone — it is cycle-bounded
         // and self-terminates.
         try {
-            mainViewModel.ft8TransmitSignal.stopTune()
+            mainViewModel.tuneCarrier.stop()
         } catch (e: Exception) {
             fileLog("onStop: stopTune threw: ${e.message}")
         }
@@ -741,9 +700,9 @@ class ComposeMainActivity : AppCompatActivity() {
     }
 
     private fun closeApp() {
-        mainViewModel.ft8TransmitSignal.isActivated = false
+        mainViewModel.rttyTransmitter.stop()
+        mainViewModel.tuneCarrier.stop()
         mainViewModel.baseRig?.connector?.disconnect()
-        mainViewModel.ft8SignalListener.stopListen()
         mainViewModel.hamRecorder?.stopRecord()
         mainViewModel.utcTimer?.delete()
         System.exit(0)

@@ -33,7 +33,9 @@ class RttyTransmitterTest {
         override fun keyUp() { events.add("keyUp") }
     }
 
-    private var ft8Busy = false
+    private var otherTxBusy = false
+    private var swrLocked = false
+    private var oversEnded = 0
     private lateinit var tx: RttyTransmitter
     private var savedDeviceId = 0
     private var savedVid = 0
@@ -50,7 +52,12 @@ class RttyTransmitterTest {
         GeneralVariables.connectMode = ConnectMode.USB_CABLE
         GeneralVariables.controlMode = ControlMode.CAT
         GeneralVariables.pttDelay = 0
-        tx = RttyTransmitter(keyer, ft8Busy = { ft8Busy })
+        tx = RttyTransmitter(
+            keyer,
+            otherTxBusy = { otherTxBusy },
+            swrLocked = { swrLocked },
+            onOverEnd = { oversEnded++ },
+        )
     }
 
     @After
@@ -172,12 +179,29 @@ class RttyTransmitterTest {
     }
 
     @Test
-    fun ft8SequencerBusy_refusesWithoutKeying() {
-        ft8Busy = true
+    fun otherTransmissionBusy_refusesWithoutKeying() {
+        otherTxBusy = true
         tx.usbOpener = RttyUsbOutputOpener { FakeOutput(true) }
 
         assertThat(tx.transmit(pcm, 12000)).isFalse()
         assertThat(events).isEmpty()
+    }
+
+    @Test
+    fun swrLockout_refusesWithoutKeying() {
+        swrLocked = true
+        tx.usbOpener = RttyUsbOutputOpener { FakeOutput(true) }
+
+        assertThat(tx.transmit(pcm, 12000)).isFalse()
+        assertThat(events).isEmpty()
+    }
+
+    @Test
+    fun overEndHook_firesOnceOnEveryExit() {
+        tx.usbOpener = RttyUsbOutputOpener { FakeOutput(false) } // a failed write still ends the over
+        tx.transmit(pcm, 12000)
+        awaitWorker()
+        assertThat(oversEnded).isEqualTo(1)
     }
 
     @Test
@@ -190,12 +214,13 @@ class RttyTransmitterTest {
 
     @Test
     fun blockReason_isOrderedBySeverity() {
-        assertThat(rttyTxBlockReason(false, false, false, false)).isEqualTo(RttyTxBlockReason.NONE)
-        assertThat(rttyTxBlockReason(true, true, true, true)).isEqualTo(RttyTxBlockReason.FT8_ACTIVE)
-        // An over already on the air outranks a route complaint: the UI shows STOP, not a toast.
-        assertThat(rttyTxBlockReason(false, true, true, false)).isEqualTo(RttyTxBlockReason.RTTY_ACTIVE)
-        assertThat(rttyTxBlockReason(false, false, true, false)).isEqualTo(RttyTxBlockReason.UNSUPPORTED_ROUTE)
-        assertThat(rttyTxBlockReason(false, false, false, true)).isEqualTo(RttyTxBlockReason.UNSUPPORTED_ROUTE)
+        assertThat(rttyTxBlockReason(false, false, false, false, false)).isEqualTo(RttyTxBlockReason.NONE)
+        assertThat(rttyTxBlockReason(true, true, true, true, true)).isEqualTo(RttyTxBlockReason.OTHER_TX)
+        // An over already on the air outranks everything below: the UI shows STOP, not a toast.
+        assertThat(rttyTxBlockReason(false, true, true, true, false)).isEqualTo(RttyTxBlockReason.RTTY_ACTIVE)
+        assertThat(rttyTxBlockReason(false, false, true, true, false)).isEqualTo(RttyTxBlockReason.SWR_LOCKED)
+        assertThat(rttyTxBlockReason(false, false, false, true, false)).isEqualTo(RttyTxBlockReason.UNSUPPORTED_ROUTE)
+        assertThat(rttyTxBlockReason(false, false, false, false, true)).isEqualTo(RttyTxBlockReason.UNSUPPORTED_ROUTE)
     }
 
     @Test

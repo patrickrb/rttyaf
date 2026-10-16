@@ -17,9 +17,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.k1af.rttyaf.database.DatabaseOpr;
-import com.k1af.rttyaf.ft8signal.FT8Package;
-import com.k1af.rttyaf.ft8transmit.GenerateFT8;
-import com.k1af.rttyaf.ft8transmit.TransmitCallsign;
 import com.k1af.rttyaf.maidenhead.MaidenheadGrid;
 import com.k1af.rttyaf.rigs.BaseRigOperation;
 import com.k1af.rttyaf.timer.UtcTimer;
@@ -173,9 +170,6 @@ public class Ft8Message {
                 callsignTo = message.callsignTo;
             }
             if (message.i3 == 4) {
-                hashList.addHash(FT8Package.getHash22(message.callsignFrom), message.callsignFrom);
-                hashList.addHash(FT8Package.getHash12(message.callsignFrom), message.callsignFrom);
-                hashList.addHash(FT8Package.getHash10(message.callsignFrom), message.callsignFrom);
             }
 
             extraInfo = message.extraInfo;
@@ -615,20 +609,8 @@ t71     Telemetry data, up to 18 hex digits
     }
 
     //Get the sender's transmit callsign object
-    public TransmitCallsign getFromCallTransmitCallsign() {
-        return new TransmitCallsign(this.i3, this.n3, this.callsignFrom, freq_hz
-                , this.getSequence()
-                , hasSnr() ? snr : 0);
-    }
 
     //Get the receiver's transmit callsign object. NOTE: the sequence is opposite to the sender's!!!
-    public TransmitCallsign getToCallTransmitCallsign() {
-        if (report == -100) {//if no signal report in the message, use the sender's SNR instead
-            return new TransmitCallsign(this.i3, this.n3, this.callsignTo, freq_hz, (this.getSequence() + 1) % 2, hasSnr() ? snr : 0);
-        } else {
-            return new TransmitCallsign(this.i3, this.n3, this.callsignTo, freq_hz, (this.getSequence() + 1) % 2, report);
-        }
-    }
 
     @SuppressLint("DefaultLocale")
     public String toHtml() {

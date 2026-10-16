@@ -19,7 +19,6 @@ import com.k1af.rttyaf.Ft8Message;
 import com.k1af.rttyaf.GeneralVariables;
 import com.k1af.rttyaf.R;
 import com.k1af.rttyaf.database.ControlMode;
-import com.k1af.rttyaf.ft8transmit.GenerateFT8;
 import com.k1af.rttyaf.ui.ToastMessage;
 import com.k1af.rttyaf.wave.FT8Resample;
 
@@ -259,59 +258,6 @@ public class TrUSDXRig extends BaseRig {
             getConnector().receiveWaveData(resampled);
         }
         //rxResample.close();
-    }
-
-    @Override
-    public void sendWaveData(Ft8Message message) {
-        if (getConnector() == null) {
-            return;
-        }
-        float[] wave = GenerateFT8.generateFt8(message, GeneralVariables.getBaseFrequency()
-                , 24000);
-
-        if (wave == null) {
-            setPTT(false);
-            return;
-        }
-        // TX volume is applied live in the send loop below (around the 8-bit
-        // midpoint), not baked into the float wave here, so dragging the slider
-        // attenuates the in-progress over instead of only the next one. Real-time
-        // granularity is bounded by the serial buffer depth rather than the cycle.
-
-//
-//        byte[] pcm16 = toWaveFloatToPCM16(wave);
-//        Resample txResample = new Resample(Resample.ConverterType.SRC_SINC_FASTEST, 1
-//                , 24000, txSampling);
-//        byte[] resampled = txResample.processCopy(pcm16);
-//        txResample.close();
-//        byte[] pcm8 = toWaveSamples16To8(resampled);
-
-        // Full-scale 8-bit unsigned PCM (zero == 128); volume applied per chunk below.
-        byte[] pcm8 = FT8Resample.get8Resample32(wave, 24000, txSampling, 1);
-
-        // Send in 256-byte chunks, scaling each chunk by the *current* volume so a
-        // mid-over slider move takes effect within a serial-buffer's worth of audio.
-        // Scale around the 8-bit midpoint (128), then re-apply the 0x3B -> 0x3A
-        // escape (';' is the CAT command terminator and must not appear in audio) —
-        // the escape must come after scaling since scaling changes byte values. At
-        // unity (vol == 1) this reproduces the previous output exactly.
-        int sent = 0;
-        while (sent < pcm8.length) {
-            int len = Math.min(256, pcm8.length - sent);
-            byte[] chunk = new byte[len];
-            float vol = GeneralVariables.volumePercent;
-            for (int i = 0; i < len; i++) {
-                int u = pcm8[sent + i] & 0xFF;                 // unsigned 0..255
-                int scaled = 128 + Math.round((u - 128) * vol);
-                if (scaled > 255) scaled = 255;
-                else if (scaled < 0) scaled = 0;
-                byte b = (byte) scaled;
-                if (b == 0x3B) b = 0x3A; // ; to :
-                chunk[i] = b;
-            }
-            getConnector().sendData(chunk);
-            sent += len;
-        }
     }
 
     /**

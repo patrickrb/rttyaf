@@ -1,6 +1,5 @@
 package com.k1af.rttyaf;
 
-import com.k1af.rttyaf.ft8transmit.GenerateFT8;
 
 /**
  * Describes one operating mode (FT8, FT4, ...). All the per-mode timing, symbol, and
@@ -116,18 +115,6 @@ public enum ModeProfile {
         return 0;                                // FTX_PROTOCOL_FT4
     }
 
-    /**
-     * Encode an a91 payload (77-bit message + CRC, shared across modes) into this mode's
-     * tone array. Dispatches to the matching native encoder.
-     *
-     * @param a91   the packed payload (>=10 bytes)
-     * @param tones output buffer, must be at least {@link #numTones} long
-     */
-    public void encode(byte[] a91, byte[] tones) {
-        if (isFt8) {
-            GenerateFT8.ft8Encode(a91, tones);
-        } else {
-            GenerateFT8.ft4Encode(a91, tones);
-        }
-    }
+    
+
 }

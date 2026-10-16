@@ -41,11 +41,14 @@ fun interface RttyUsbOutputOpener {
 enum class RttyTxBlockReason {
     NONE,
 
-    /** The FT8 sequencer is armed or on the air; the rig is its. */
-    FT8_ACTIVE,
+    /** Another transmission (the tune carrier) owns the rig. */
+    OTHER_TX,
 
     /** An RTTY over is already going out (single-flight). */
     RTTY_ACTIVE,
+
+    /** The SWR protection has locked TX out until the operator clears it. */
+    SWR_LOCKED,
 
     /** Network (Icom LAN) or (tr)uSDX CAT audio: RTTY has no sender for those. */
     UNSUPPORTED_ROUTE,
@@ -56,13 +59,15 @@ enum class RttyTxBlockReason {
  * USB-direct sound card. That route is served, not refused. Unit-tested.
  */
 internal fun rttyTxBlockReason(
-    ft8ActiveOrArmed: Boolean,
+    otherTxActive: Boolean,
     rttyActive: Boolean,
+    swrLocked: Boolean,
     networkRoute: Boolean,
     catAudioRoute: Boolean,
 ): RttyTxBlockReason = when {
-    ft8ActiveOrArmed -> RttyTxBlockReason.FT8_ACTIVE
+    otherTxActive -> RttyTxBlockReason.OTHER_TX
     rttyActive -> RttyTxBlockReason.RTTY_ACTIVE
+    swrLocked -> RttyTxBlockReason.SWR_LOCKED
     networkRoute || catAudioRoute -> RttyTxBlockReason.UNSUPPORTED_ROUTE
     else -> RttyTxBlockReason.NONE
 }
@@ -83,15 +88,19 @@ internal fun shouldWarnTxDropped(success: Boolean, cancelled: Boolean): Boolean 
  * never acceptable.
  *
  * @param keyer PTT up/down through the configured control path.
- * @param ft8Busy true while the inherited FT8 sequencer is armed or on the air
- *   (RTTY must never fight it for the rig); goes away with the FT8 engine.
+ * @param otherTxBusy true while another transmission (the tune carrier) owns the rig.
  * @param catAudioRoute true when the rig's CAT link carries the audio ((tr)uSDX),
  *   which RTTY has no sender for.
+ * @param swrLocked true while the SWR protection has TX locked out.
+ * @param onOverEnd called on the worker after every over (success, failure or
+ *   STOP) — the ALC auto-level hook.
  */
 class RttyTransmitter(
     private val keyer: RttyKeyer,
-    private val ft8Busy: () -> Boolean = { false },
+    private val otherTxBusy: () -> Boolean = { false },
     private val catAudioRoute: () -> Boolean = { false },
+    private val swrLocked: () -> Boolean = { false },
+    private val onOverEnd: () -> Unit = {},
 ) {
     private val transmittingState = MutableLiveData(false)
 
@@ -135,8 +144,9 @@ class RttyTransmitter(
     fun transmit(pcm: FloatArray, sampleRate: Int): Boolean {
         if (pcm.isEmpty() || sampleRate <= 0) return false
         val block = rttyTxBlockReason(
-            ft8ActiveOrArmed = ft8Busy(),
+            otherTxActive = otherTxBusy(),
             rttyActive = isTransmitting,
+            swrLocked = swrLocked(),
             networkRoute = GeneralVariables.connectMode == ConnectMode.NETWORK,
             catAudioRoute = catAudioRoute(),
         )
@@ -144,8 +154,10 @@ class RttyTransmitter(
             // Logged so a "TX did nothing" report reads straight off debug.log.
             GeneralVariables.fileLog("RTTY TX: refused reason=$block")
             when (block) {
-                RttyTxBlockReason.FT8_ACTIVE ->
+                RttyTxBlockReason.OTHER_TX ->
                     ToastMessage.show(GeneralVariables.getStringFromResource(R.string.tune_blocked_tx))
+                RttyTxBlockReason.SWR_LOCKED ->
+                    ToastMessage.show(GeneralVariables.getStringFromResource(R.string.swr_lockout_toast))
                 RttyTxBlockReason.UNSUPPORTED_ROUTE ->
                     ToastMessage.show(GeneralVariables.getStringFromResource(R.string.rtty_tx_unavailable_route))
                 else -> Unit // RTTY_ACTIVE: the UI already shows STOP for the over in progress
@@ -233,6 +245,11 @@ class RttyTransmitter(
             GeneralVariables.fileLog(
                 "RTTY TX: stop cancelled=$wasCancelled durationMs=${System.currentTimeMillis() - startedAt}",
             )
+            try {
+                onOverEnd()
+            } catch (e: Exception) {
+                Log.e(TAG, "over-end hook failed: $e")
+            }
         }
     }
 
