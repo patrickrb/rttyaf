@@ -781,6 +781,14 @@ public class UsbAudioDevice {
             }
         }
 
+        // STOP pressed during the resample/convert above: cancelWrite() set the
+        // Java flag, but nativeWrite() resets the native one on entry, so without
+        // this check the whole message would still go out.
+        if (UsbAudioNative.writeCancelled) {
+            Log.d(TAG, "writeAudio cancelled before the first packet");
+            return false;
+        }
+
         // Prefer the libusb-backed native path. Same reason as input: on hosts
         // where Android's UsbRequest can't drive iso (notably car-dash kernels)
         // request.initialize() returns false and writeAudio fails immediately,

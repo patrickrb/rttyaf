@@ -162,6 +162,41 @@ public class FT8TransmitSignal {
     private volatile boolean rttyTxCancelled = false;
     private volatile boolean rttyUsbRoute = false;
     private AudioTrack rttyAudioTrack = null;
+
+    /** An opened USB-direct output stream, as the RTTY worker sees it. Package-visible for tests. */
+    interface RttyUsbOutput {
+        /** Stream the full-scale waveform; false on failure or STOP. */
+        boolean write(float[] pcm, int sampleRate);
+
+        void close();
+    }
+
+    /** Opens the operator's USB-direct output, or null when it can't. Package-visible for tests. */
+    interface RttyUsbOutputOpener {
+        RttyUsbOutput open();
+    }
+
+    /**
+     * The real USB-direct output behind {@link #playRttyViaUsb}: the shared
+     * {@link #openUsbAudioOutput} plus {@link UsbAudioDevice#writeAudio}. Tests
+     * swap in a fake to exercise the worker's keying/close discipline without
+     * hardware.
+     */
+    RttyUsbOutputOpener rttyUsbOpener = () -> {
+        UsbAudioDevice dev = openUsbAudioOutput("RTTY TX");
+        if (dev == null) return null;
+        return new RttyUsbOutput() {
+            @Override
+            public boolean write(float[] pcm, int sampleRate) {
+                return dev.writeAudio(pcm, sampleRate);
+            }
+
+            @Override
+            public void close() {
+                dev.close();
+            }
+        };
+    };
     public final MutableLiveData<Boolean> mutableIsRttyTransmitting = new MutableLiveData<>();
 
     private final OnDoTransmitted onDoTransmitted;// typically used for opening/closing PTT
@@ -2866,19 +2901,26 @@ public class FT8TransmitSignal {
      * here is told to the operator because the rig has already keyed on dead air.
      */
     private void playRttyViaUsb(float[] pcm, int sampleRate) {
-        UsbAudioDevice usbDev = openUsbAudioOutput("RTTY TX");
-        if (usbDev == null) {
+        RttyUsbOutput out = rttyUsbOpener.open();
+        if (out == null) {
             ToastMessage.show(GeneralVariables.getStringFromResource(R.string.tx_audio_dropped));
             return;
         }
         try {
-            boolean ok = usbDev.writeAudio(pcm, sampleRate);
+            // STOP while the device was opening (tens of ms) must not play the
+            // whole over: writeAudio resets the *shared* cancel flags on entry,
+            // so only this over's own flag survives the open. Check it last.
+            if (rttyTxCancelled) {
+                GeneralVariables.fileLog("RTTY TX: STOP during device open, nothing written");
+                return;
+            }
+            boolean ok = out.write(pcm, sampleRate);
             GeneralVariables.fileLog("RTTY TX: writeAudio returned " + (ok ? "OK" : "FAILED"));
-            if (shouldWarnTxDropped(ok, UsbAudioNative.writeCancelled)) {
+            if (shouldWarnTxDropped(ok, rttyTxCancelled || UsbAudioNative.writeCancelled)) {
                 ToastMessage.show(GeneralVariables.getStringFromResource(R.string.tx_audio_dropped));
             }
         } finally {
-            usbDev.close();
+            out.close();
         }
     }
 

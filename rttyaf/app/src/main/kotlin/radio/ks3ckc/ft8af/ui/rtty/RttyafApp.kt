@@ -25,6 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -203,6 +206,9 @@ private fun StatusBanner() {
     val text = statusBannerText(raw) ?: return
     Box(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+            // Announce without stealing focus from the TX button a screen
+            // reader is probably still on.
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .clip(RoundedCornerShape(12.dp)).background(BgSurface2)
             .border(1.dp, Accent, RoundedCornerShape(12.dp))
             .padding(horizontal = 14.dp, vertical = 10.dp),
