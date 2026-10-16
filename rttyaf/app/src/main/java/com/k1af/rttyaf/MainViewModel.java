@@ -72,6 +72,8 @@ import com.k1af.rttyaf.flex.RadioTcpClient;
 import com.k1af.rttyaf.ft8listener.FT8SignalListener;
 import com.k1af.rttyaf.ft8listener.OnFt8Listen;
 import com.k1af.rttyaf.ft8transmit.FT8TransmitSignal;
+import radio.ks3ckc.rttyaf.rtty.RttyKeyer;
+import radio.ks3ckc.rttyaf.rtty.RttyTransmitter;
 import com.k1af.rttyaf.ft8transmit.MeterProtectionController;
 import com.k1af.rttyaf.ft8transmit.OnDoTransmitted;
 import com.k1af.rttyaf.ft8transmit.OnTransmitSuccess;
@@ -228,6 +230,8 @@ public class MainViewModel extends ViewModel {
     public HamRecorder hamRecorder;//recording object
     public FT8SignalListener ft8SignalListener;//object for listening to and decoding FT8 signals
     public FT8TransmitSignal ft8TransmitSignal;//object for transmitting signals
+    /** RTTY TX: shares the PTT path with FT8/tune and nothing else (see RttyTransmitter). */
+    public RttyTransmitter rttyTransmitter;
     // Deep-pass decodes that arrived mid-TX, replayed to the sequencer after key-up
     private final PendingSequencerDecodes pendingSequencerDecodes = new PendingSequencerDecodes();
     public MeterProtectionController meterProtectionController;//ALC auto-volume + SWR halt
@@ -735,7 +739,7 @@ public class MainViewModel extends ViewModel {
 
 
         //create transmit object; callbacks: before transmit, after transmit, after QSL success.
-        ft8TransmitSignal = new FT8TransmitSignal(databaseOpr, new OnDoTransmitted() {
+        final OnDoTransmitted ft8Keyer = new OnDoTransmitted() {
             private boolean needControlSco() {//determine whether SCO needs to be enabled based on control mode
                 return ScoPolicy.needControlSco(GeneralVariables.connectMode,
                         GeneralVariables.controlMode,
@@ -838,7 +842,8 @@ public class MainViewModel extends ViewModel {
                 SafeExecutor.tryExecute(sendWaveDataThreadPool, sendWaveDataRunnable);
             }
 
-        }, new OnTransmitSuccess() {//when QSO is successful
+        };
+        ft8TransmitSignal = new FT8TransmitSignal(databaseOpr, ft8Keyer, new OnTransmitSuccess() {//when QSO is successful
             @Override
             public void doAfterTransmit(QSLRecord qslRecord) {
                 databaseOpr.addQSL_Callsign(qslRecord);//two operations: record callsign and QSL
@@ -884,6 +889,23 @@ public class MainViewModel extends ViewModel {
         meterProtectionController = new MeterProtectionController();
         meterProtectionController.setTransmitSignal(ft8TransmitSignal);
         ft8TransmitSignal.setMeterProtectionController(meterProtectionController);
+
+        // RTTY TX keys the rig through the same CAT/RTS/DTR path as FT8 and the
+        // tune carrier, and yields to the FT8 sequencer while that still exists.
+        rttyTransmitter = new RttyTransmitter(
+                new RttyKeyer() {
+                    @Override
+                    public void keyDown() {
+                        ft8Keyer.onTuneKeyDown();
+                    }
+
+                    @Override
+                    public void keyUp() {
+                        ft8Keyer.onTuneKeyUp();
+                    }
+                },
+                () -> ft8TransmitSignal.isTransmitting() || ft8TransmitSignal.isActivated(),
+                ft8Keyer::supportTransmitOverCAT);
 
         //open HTTP SERVER
         httpServer = new LogHttpServer(this, LogHttpServer.DEFAULT_PORT);
@@ -1004,7 +1026,7 @@ public class MainViewModel extends ViewModel {
     /** {@link #retuneAllowed} evaluated against the live transmitter state. */
     public boolean isRetuneAllowed() {
         return ft8TransmitSignal == null
-                || retuneAllowed(ft8TransmitSignal.isTransmitting(), ft8TransmitSignal.isRttyTransmitting());
+                || retuneAllowed(ft8TransmitSignal.isTransmitting(), rttyTransmitter.isTransmitting());
     }
 
     /**
@@ -1268,7 +1290,7 @@ public class MainViewModel extends ViewModel {
     public boolean qsyTo(long freq) {
         if (freq <= 0) return false;
         if (ft8TransmitSignal != null
-                && (ft8TransmitSignal.isTransmitting() || ft8TransmitSignal.isRttyTransmitting())) {
+                && (ft8TransmitSignal.isTransmitting() || rttyTransmitter.isTransmitting())) {
             fileLog("qsyTo: refused, transmitting (freq=" + freq + ")");
             return false;
         }

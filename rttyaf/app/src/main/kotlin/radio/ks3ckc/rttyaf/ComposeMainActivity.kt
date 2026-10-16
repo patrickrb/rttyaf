@@ -177,7 +177,7 @@ class ComposeMainActivity : AppCompatActivity() {
                     val mode = rttyStore.load()
                     radio.ks3ckc.rttyaf.rtty.RttyEngine(
                         mainViewModel.hamRecorder,
-                        mainViewModel.ft8TransmitSignal,
+                        mainViewModel.rttyTransmitter,
                         initialConfig = mode.toConfig(),
                         initialAfc = mode.afc,
                         initialNet = mode.net,

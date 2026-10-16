@@ -1097,6 +1097,76 @@ public class UsbAudioDevice {
 
     public boolean hasInput() { return endpointIn != null; }
     public boolean hasOutput() { return endpointOut != null; }
+
+    /**
+     * Whether TX audio goes out the USB-direct (libusb) route: the operator picked a
+     * USB sound card ("USB direct" = output device id -1) and its VID is saved. The
+     * one expression every TX path (FT8, tune, RTTY) agrees on. Pure — unit-tested.
+     */
+    public static boolean isUsbDirectOutput(int audioOutputDeviceId, int usbAudioOutputVendorId) {
+        return audioOutputDeviceId == -1 && usbAudioOutputVendorId != 0;
+    }
+
+    /**
+     * Open the operator's USB-direct output device (by the saved VID:PID) and
+     * activate its output stream at 48 kHz. Shared by FT8 TX and RTTY TX. Every
+     * abort is logged with {@code who} as the prefix so debug.log says which TX
+     * path hit it; returns null on any failure (the caller unkeys and/or tells
+     * the operator). The caller owns {@link #close()}.
+     */
+    public static UsbAudioDevice openConfiguredOutput(String who) {
+        Context context = com.k1af.rttyaf.GeneralVariables.getMainContext();
+        if (context == null) {
+            com.k1af.rttyaf.GeneralVariables.fileLog(who + ": ABORT no main context");
+            return null;
+        }
+
+        UsbDevice device = findDeviceByVidPid(context,
+                com.k1af.rttyaf.GeneralVariables.usbAudioOutputVendorId,
+                com.k1af.rttyaf.GeneralVariables.usbAudioOutputProductId);
+        if (device == null) {
+            com.k1af.rttyaf.GeneralVariables.fileLog(String.format(
+                    "%s: ABORT USB audio output device not found by VID:PID %04X:%04X",
+                    who,
+                    com.k1af.rttyaf.GeneralVariables.usbAudioOutputVendorId,
+                    com.k1af.rttyaf.GeneralVariables.usbAudioOutputProductId));
+            return null;
+        }
+
+        android.hardware.usb.UsbManager usbManager =
+                (android.hardware.usb.UsbManager) context.getSystemService(Context.USB_SERVICE);
+        if (usbManager == null) {
+            com.k1af.rttyaf.GeneralVariables.fileLog(who + ": ABORT UsbManager is null");
+            return null;
+        }
+        if (!usbManager.hasPermission(device)) {
+            com.k1af.rttyaf.GeneralVariables.fileLog(who + ": ABORT no USB permission for output device "
+                    + "(re-pick (USB direct) in Settings to re-grant)");
+            return null;
+        }
+
+        UsbAudioDevice usbDev = new UsbAudioDevice();
+        if (!usbDev.open(context, device)) {
+            com.k1af.rttyaf.GeneralVariables.fileLog(who + ": ABORT UsbAudioDevice.open() failed "
+                    + "(descriptor parse or claimInterface failed)");
+            return null;
+        }
+
+        if (!usbDev.hasOutput()) {
+            com.k1af.rttyaf.GeneralVariables.fileLog(who + ": ABORT device has no output endpoint");
+            usbDev.close();
+            return null;
+        }
+
+        if (!usbDev.activateOutput(48000)) {
+            com.k1af.rttyaf.GeneralVariables.fileLog(who + ": ABORT activateOutput(48000) failed "
+                    + "(alt-setting select or rate setup failed)");
+            usbDev.close();
+            return null;
+        }
+        com.k1af.rttyaf.GeneralVariables.fileLog(who + ": device opened, output activated at 48000 Hz");
+        return usbDev;
+    }
     public UsbDevice getUsbDevice() { return usbDevice; }
     public int getInputSampleRate() { return inputSampleRate; }
     public int getOutputSampleRate() { return outputSampleRate; }

@@ -6,7 +6,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.k1af.rttyaf.GeneralVariables
-import com.k1af.rttyaf.ft8transmit.FT8TransmitSignal
 import com.k1af.rttyaf.wave.HamRecorder
 
 /**
@@ -24,7 +23,7 @@ import com.k1af.rttyaf.wave.HamRecorder
  */
 class RttyEngine(
     private val hamRecorder: HamRecorder?,
-    private val transmitSignal: FT8TransmitSignal? = null,
+    private val transmitter: RttyTransmitter? = null,
     /** Modem parameters to start with — normally the operator's saved [RttyModePrefs]. */
     initialConfig: RttyConfig = RttyConfig(),
     /** Whether AFC is engaged at start (off by default: the tones stay put until the operator opts in). */
@@ -40,7 +39,7 @@ class RttyEngine(
 
     /** Live TX state (true while an over is on the air), for the UI to observe. */
     val transmittingLive: LiveData<Boolean>
-        get() = transmitSignal?.mutableIsRttyTransmitting ?: noTxState
+        get() = transmitter?.transmittingLive ?: noTxState
 
     var config by mutableStateOf(initialConfig)
         private set
@@ -235,25 +234,25 @@ class RttyEngine(
     /**
      * Modulate [text] to an RTTY (Baudot-FSK) waveform at the sound-card rate and
      * transmit it over the air (key → send → unkey), delegating keying + audio
-     * routing to the shared [FT8TransmitSignal]. Returns false when there is no
+     * routing to the shared [RttyTransmitter]. Returns false when there is no
      * TX backend, nothing to send, or the backend blocks the audio route.
      *
      * The waveform is generated at [GeneralVariables.audioSampleRate] (not the
      * 12 kHz RX rate) so the AudioTrack plays the tones at the correct pitch.
      */
     fun transmit(text: String): Boolean {
-        val tx = transmitSignal ?: return false
+        val tx = transmitter ?: return false
         val msg = text.trim()
         if (msg.isEmpty()) return false
         val rate = txSampleRate(GeneralVariables.audioSampleRate, config.sampleRate)
         val txCfg = txConfigFor(config, nominalMarkHz, net).copy(sampleRate = rate)
         val pcm = RttyEncoder(txCfg).encode(txMessage(msg))
-        return tx.transmitRtty(pcm, rate)
+        return tx.transmit(pcm, rate)
     }
 
     /** Abort an in-progress transmission (STOP). No-op if not transmitting. */
     fun stopTx() {
-        transmitSignal?.stopRttyTx()
+        transmitter?.stop()
     }
 
     /**
