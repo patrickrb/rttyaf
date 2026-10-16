@@ -548,45 +548,6 @@ public class Ft8MessageTest {
         assertThat(msg.getSequence4()).isEqualTo(0);
     }
 
-    // ---- TransmitCallsign factory methods -----------------------------------
-
-    @Test
-    public void getFromCallTransmitCallsign_carriesSenderFieldsAndSnr() {
-        Ft8Message msg = new Ft8Message("CQ", "K1ABC", "FN42");
-        msg.utcTime = 0; // getSequence() -> 0
-        msg.snr = 12;
-        msg.freq_hz = 1500f;
-        com.k1af.rttyaf.ft8transmit.TransmitCallsign tc = msg.getFromCallTransmitCallsign();
-        assertThat(tc.callsign).isEqualTo("K1ABC");
-        assertThat(tc.snr).isEqualTo(12);
-        assertThat(tc.sequential).isEqualTo(0);
-    }
-
-    @Test
-    public void getToCallTransmitCallsign_usesSnrWhenNoReport_andFlipsSequence() {
-        // report == -100 (default) -> falls back to snr; sequence is the opposite
-        // of the sender's: (getSequence() + 1) % 2.
-        Ft8Message msg = new Ft8Message("K1ABC", "W9XYZ", "FN42");
-        msg.utcTime = 0; // sender getSequence() -> 0, so toCall sequence -> 1
-        msg.snr = -8;
-        com.k1af.rttyaf.ft8transmit.TransmitCallsign tc = msg.getToCallTransmitCallsign();
-        assertThat(tc.callsign).isEqualTo("K1ABC");
-        assertThat(tc.snr).isEqualTo(-8);
-        assertThat(tc.sequential).isEqualTo(1);
-    }
-
-    @Test
-    public void getToCallTransmitCallsign_usesReportWhenPresent() {
-        // report != -100 -> the report value is carried as the snr field.
-        Ft8Message msg = new Ft8Message("K1ABC", "W9XYZ", "FN42");
-        msg.utcTime = 15000; // sender getSequence() -> 1, so toCall sequence -> 0
-        msg.snr = -8;
-        msg.report = 5;
-        com.k1af.rttyaf.ft8transmit.TransmitCallsign tc = msg.getToCallTransmitCallsign();
-        assertThat(tc.snr).isEqualTo(5);
-        assertThat(tc.sequential).isEqualTo(0);
-    }
-
     // ---- SNR_UNKNOWN sentinel tests -----------------------------------------
 
     @Test
@@ -634,23 +595,4 @@ public class Ft8MessageTest {
         assertThat(msg.getdB()).isEqualTo("0");
     }
 
-    @Test
-    public void getFromCallTransmitCallsign_unknownSnr_fallsBackToZero() {
-        Ft8Message msg = new Ft8Message("CQ", "K1ABC", "FN42");
-        msg.utcTime = 0;
-        // snr is SNR_UNKNOWN by default
-        msg.freq_hz = 1500f;
-        com.k1af.rttyaf.ft8transmit.TransmitCallsign tc = msg.getFromCallTransmitCallsign();
-        assertThat(tc.snr).isEqualTo(0);
-    }
-
-    @Test
-    public void getToCallTransmitCallsign_unknownSnr_fallsBackToZero() {
-        Ft8Message msg = new Ft8Message("K1ABC", "W9XYZ", "FN42");
-        msg.utcTime = 0;
-        // snr is SNR_UNKNOWN by default, report is -100 (no report) -> falls back to SNR
-        msg.freq_hz = 1500f;
-        com.k1af.rttyaf.ft8transmit.TransmitCallsign tc = msg.getToCallTransmitCallsign();
-        assertThat(tc.snr).isEqualTo(0);
-    }
 }

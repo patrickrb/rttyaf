@@ -48,11 +48,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.k1af.rttyaf.Ft8Message
 import com.k1af.rttyaf.GeneralVariables
 import com.k1af.rttyaf.MainViewModel
 import com.k1af.rttyaf.R
-import com.k1af.rttyaf.ft8signal.FT8Package
 import com.k1af.rttyaf.location.GridLocationUpdater
 import radio.ks3ckc.rttyaf.theme.*
 import radio.ks3ckc.rttyaf.ui.components.GlassCard
@@ -201,11 +199,6 @@ private fun SettingsLanding(
                 callsignState = trimmedCall
                 GeneralVariables.myCallsign = trimmedCall
                 mainViewModel.databaseOpr.writeConfig("callsign", trimmedCall, null)
-                for (seedCall in ownCallsignsToSeed(trimmedCall)) {
-                    Ft8Message.hashList.addHash(FT8Package.getHash22(seedCall).toLong(), seedCall)
-                    Ft8Message.hashList.addHash(FT8Package.getHash12(seedCall).toLong(), seedCall)
-                    Ft8Message.hashList.addHash(FT8Package.getHash10(seedCall).toLong(), seedCall)
-                }
 
                 val formattedGrid = buildString {
                     newGrid.trim().forEachIndexed { i, c ->

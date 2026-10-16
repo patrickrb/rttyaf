@@ -12,7 +12,6 @@ import com.k1af.rttyaf.GeneralVariables;
 import com.k1af.rttyaf.R;
 import com.k1af.rttyaf.connector.ConnectMode;
 import com.k1af.rttyaf.database.ControlMode;
-import com.k1af.rttyaf.ft8transmit.GenerateFT8;
 import com.k1af.rttyaf.icom.IComPacketTypes;
 import com.k1af.rttyaf.ui.ToastMessage;
 
@@ -144,19 +143,6 @@ public class IcomRig extends BaseRig {
             }
         }
         return -1;
-    }
-
-    @Override
-    public void sendWaveData(Ft8Message message) {//send audio data to rig, for network mode
-        if (getConnector() != null) {//pass generated audio data to Connector
-            float[] data = GenerateFT8.generateFt8(message, GeneralVariables.getBaseFrequency()
-                    , 12000);//ICOM rig audio sample rate is 12000
-            if (data == null) {
-                setPTT(false);
-                return;
-            }
-            getConnector().sendWaveData(data);
-        }
     }
 
     private void analysisCommand(byte[] data) {

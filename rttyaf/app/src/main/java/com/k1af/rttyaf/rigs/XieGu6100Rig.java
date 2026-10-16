@@ -10,7 +10,6 @@ import com.k1af.rttyaf.GeneralVariables;
 import com.k1af.rttyaf.R;
 import com.k1af.rttyaf.connector.ConnectMode;
 import com.k1af.rttyaf.database.ControlMode;
-import com.k1af.rttyaf.ft8transmit.GenerateFT8;
 import com.k1af.rttyaf.ui.ToastMessage;
 
 import java.util.Timer;
@@ -269,26 +268,6 @@ public class XieGu6100Rig extends BaseRig {
         }
 
 
-    }
-
-    @Override
-    public void sendWaveData(Ft8Message message) {//send audio data to rig, for network mode
-        if (getConnector() != null) {//pass generated audio data to Connector
-            //if ft8cns mode, transmit a91 data packet
-            if (GeneralVariables.instructionSet == InstructionSet.XIEGU_6100_FT8CNS) {
-                //Log.e(TAG,"generate A91");
-                getConnector().sendFt8A91(GenerateFT8.generateA91(message, true)
-                        , GeneralVariables.getBaseFrequency());
-            } else {//otherwise transmit audio data normally
-                float[] data = GenerateFT8.generateFt8(message, GeneralVariables.getBaseFrequency()
-                        , 12000);//ICOM rig audio sample rate is 12000
-                if (data == null) {
-                    setPTT(false);
-                    return;
-                }
-                getConnector().sendWaveData(data);
-            }
-        }
     }
 
     @Override

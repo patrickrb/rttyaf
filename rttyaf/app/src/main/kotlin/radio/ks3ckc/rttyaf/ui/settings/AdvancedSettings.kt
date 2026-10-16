@@ -341,7 +341,6 @@ fun AdvancedSettings(
                 val clamped = value.coerceIn(1, 9999)
                 GeneralVariables.transmitDelay = clamped
                 txDelay = clamped
-                mainViewModel.ft8TransmitSignal.setTimer_sec(clamped)
                 mainViewModel.databaseOpr.writeConfig("transDelay", clamped.toString(), null)
             },
         )

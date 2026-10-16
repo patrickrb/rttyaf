@@ -20,8 +20,8 @@ import com.k1af.rttyaf.GeneralVariables;
 public class MeterProtectionController {
     private static final String TAG = "MeterProtection";
 
-    // Reference to the transmit signal — set after construction
-    private FT8TransmitSignal transmitSignal;
+    // What to abort when the SWR halt fires — set after construction.
+    private Runnable onSwrHalt;
 
     // ALC auto-volume tuning. The TX audio buffer has its volume baked in once at
     // the start of each cycle (the USB-direct path writes the entire buffer in a
@@ -52,8 +52,9 @@ public class MeterProtectionController {
     private long lastSwrLogMs = 0;
     private int lastLoggedSwr = -1;
 
-    public void setTransmitSignal(FT8TransmitSignal signal) {
-        this.transmitSignal = signal;
+    /** Register the action that takes whatever is on the air off it when SWR halts TX. */
+    public void setOnSwrHalt(Runnable onSwrHalt) {
+        this.onSwrHalt = onSwrHalt;
     }
 
     /**
@@ -165,8 +166,8 @@ public class MeterProtectionController {
         lockoutSwrRatio.postValue(ratio);
         swrLockout.postValue(true);
 
-        if (transmitSignal != null) {
-            transmitSignal.setActivated(false);
+        if (onSwrHalt != null) {
+            onSwrHalt.run();
         }
     }
 

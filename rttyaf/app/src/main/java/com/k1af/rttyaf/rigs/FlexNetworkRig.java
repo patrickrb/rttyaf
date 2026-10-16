@@ -8,7 +8,6 @@ import com.k1af.rttyaf.GeneralVariables;
 import com.k1af.rttyaf.connector.FlexConnector;
 import com.k1af.rttyaf.flex.FlexCommand;
 import com.k1af.rttyaf.flex.FlexRadio;
-import com.k1af.rttyaf.ft8transmit.GenerateFT8;
 
 public class FlexNetworkRig extends BaseRig {
     private static final String TAG = "FlexNetworkRig";
@@ -80,20 +79,6 @@ public class FlexNetworkRig extends BaseRig {
     public void readFreqFromRig() {
         if (getConnector() != null) {
             //getConnector().sendData(IcomRigConstant.setReadFreq(ctrAddress, getCivAddress()));
-        }
-    }
-
-    @Override
-    public void sendWaveData(Ft8Message message) {
-
-        if (getConnector() != null) {
-            float[] data = GenerateFT8.generateFt8(message, GeneralVariables.getBaseFrequency()
-                    , 24000);//Flex audio sample rate is 24000
-            if (data == null) {
-                setPTT(false);
-                return;
-            }
-            getConnector().sendWaveData(data);
         }
     }
 

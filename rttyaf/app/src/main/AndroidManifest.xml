@@ -74,14 +74,6 @@
                 android:resource="@xml/device_filter" />
         </activity>
 
-        <activity
-            android:name=".FAQActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".grid_tracker.GridTrackerMainActivity"
-            android:exported="false" />
-
         <service
             android:name=".bluetooth.BluetoothSerialService"
             android:exported="false" />

@@ -1,32 +1,13 @@
-# RTTYAF native module.
-#
-# Builds a single librttyaf.so containing:
-#   - All FT8/FT4/FT2 DSP (encode, decode, FFT, resample, hash, GFSK)
-#   - USB Audio Class capture (libusb-backed)
-#
-# The prebuilt libft8cn.so is no longer used — all native functionality is
-# now built from the in-tree kgoba ft8_lib (pinned at 6f528128) and the
-# rttyaf_glue JNI wrappers.
-#
-# Why libusb: Android's UsbRequest API silently fails to drive
-# isochronous transfers on some kernels (notably automotive Android
-# variants), throwing IllegalStateException on first queue. libusb
-# uses USBDEVFS ioctls directly and is the most battle-tested option
-# for USB audio on Android.
-
 cmake_minimum_required(VERSION 3.18.1)
 
+# librttyaf.so: the USB-audio (libusb) bridge only. The RTTY modem is pure
+# Kotlin; the FT8 DSP (ft8_lib) and its JNI glue were removed with the FT8
+# engine. What remains lets the app drive a USB sound card (CM108-style codecs
+# and car-dash kernels) directly when Android's own USB audio path can't.
 project(rttyaf_native)
 
-# ---------------------------------------------------------------------------
-# libusb 1.0.27 (static)
-# ---------------------------------------------------------------------------
-# Source list mirrors libusb/android/jni/libusb.mk — only the Linux/USBFS
-# backend + POSIX threads/events; the macOS/Windows/Haiku/etc. backends in
-# libusb/os/ are intentionally not compiled.
-
+# libusb (static), built from the vendored source tree.
 set(LIBUSB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/libusb)
-
 add_library(usb1.0 STATIC
         ${LIBUSB_ROOT}/libusb/core.c
         ${LIBUSB_ROOT}/libusb/descriptor.c
@@ -39,7 +20,6 @@ add_library(usb1.0 STATIC
         ${LIBUSB_ROOT}/libusb/os/threads_posix.c
         ${LIBUSB_ROOT}/libusb/os/linux_netlink.c
 )
-
 target_include_directories(usb1.0
         PUBLIC
         ${LIBUSB_ROOT}/libusb
@@ -47,10 +27,6 @@ target_include_directories(usb1.0
         ${LIBUSB_ROOT}/android
         ${LIBUSB_ROOT}/libusb/os
 )
-
-# libusb assumes POSIX threads, eventfd, timerfd, etc. — all present on
-# Android. Hidden visibility matches upstream's Android build so we don't
-# accidentally re-export libusb symbols from our .so.
 target_compile_options(usb1.0 PRIVATE
         -fvisibility=hidden
         -pthread
@@ -58,76 +34,16 @@ target_compile_options(usb1.0 PRIVATE
         -Wno-deprecated-declarations
 )
 
-# ---------------------------------------------------------------------------
-# rttyaf_dsp — from-source FT8/FT4/FT2 DSP (static)
-# ---------------------------------------------------------------------------
-# The full kgoba ft8_lib (pinned at 6f528128) including encode.c. All DSP
-# symbols are linked into the single librttyaf.so shared library; no prebuilt
-# dependency remains.
-
-set(FT8LIB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ft8_lib)
-
-add_library(rttyaf_dsp STATIC
-        ${FT8LIB_ROOT}/ft8/encode.c
-        ${FT8LIB_ROOT}/ft8/decode.c
-        ${FT8LIB_ROOT}/ft8/ldpc.c
-        ${FT8LIB_ROOT}/ft8/osd.c
-        ${FT8LIB_ROOT}/ft8/crc.c
-        ${FT8LIB_ROOT}/ft8/message.c
-        ${FT8LIB_ROOT}/ft8/pack.c
-        ${FT8LIB_ROOT}/ft8/unpack.c
-        ${FT8LIB_ROOT}/ft8/text.c
-        ${FT8LIB_ROOT}/ft8/constants.c
-        ${FT8LIB_ROOT}/common/monitor.c
-        ${FT8LIB_ROOT}/fft/kiss_fft.c
-        ${FT8LIB_ROOT}/fft/kiss_fftr.c
-)
-
-target_include_directories(rttyaf_dsp PUBLIC ${FT8LIB_ROOT})
-
-target_compile_options(rttyaf_dsp PRIVATE
-        -Wno-unused-function
-)
-
-# ---------------------------------------------------------------------------
-# librttyaf.so — unified JNI bridge (replaces both libft8cn.so and librttyaf_usb.so)
-# ---------------------------------------------------------------------------
-
+# The JNI bridge (UsbAudioNative): iso capture with FIR decimation / rational
+# resampling to the modem rate, and iso playback with live TX gain.
 add_library(rttyaf SHARED
-        # USB audio
         usb_audio.cpp
         usb_audio_capture.cpp
-        # GFSK synthesis
-        rttyaf_glue/gfsk.c
-        # JNI wrappers — encode/pack/GFSK
-        rttyaf_glue/ft8_encode_jni.cpp
-        # JNI wrappers — callsign hash
-        rttyaf_glue/ft8_hash_jni.cpp
-        # JNI wrappers — FFT display
-        rttyaf_glue/ft8_fft_jni.cpp
-        rttyaf_glue/fft_display.c
-        # JNI wrappers — audio resampler
-        rttyaf_glue/ft8_resample_jni.cpp
-        # JNI wrappers — FT8 decoder (replaces prebuilt)
-        rttyaf_glue/ft8_decode_jni.cpp
-        # Deep-decode signal subtraction (shared with host bench + desktop)
-        rttyaf_glue/ft8_subtract.c
-        # Fine-sync coherent demod retry (shared with host bench)
-        rttyaf_glue/ft8_fine.c
-        # Cross-slot decoding: LLR accumulation + message-history retry
-        rttyaf_glue/ft8_xslot.c
-        # JNI wrappers — FT2/FT4 decoder (from-source, was in rttyaf_usb)
-        rttyaf_glue/ft2_decode_jni.cpp
 )
 
-target_include_directories(rttyaf PRIVATE ${FT8LIB_ROOT})
-
 find_library(log-lib log)
-
 target_link_options(rttyaf PRIVATE "-Wl,-z,max-page-size=16384")
-
 target_link_libraries(rttyaf
         usb1.0
-        rttyaf_dsp
         ${log-lib}
 )
