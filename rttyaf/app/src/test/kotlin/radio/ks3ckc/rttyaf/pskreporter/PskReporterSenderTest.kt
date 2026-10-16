@@ -36,6 +36,14 @@ class PskReporterSenderTest {
     // ---------------------------------------------------------------
 
     @Test
+    fun `stop before start is a no-op`() {
+        // MainViewModel no longer starts the sender (Ft8EnginePolicy) but still
+        // stops it in onCleared(); that must neither throw nor send anything.
+        PskReporterSender.stop()
+        assertThat(captured).isEmpty()
+    }
+
+    @Test
     fun `encodeVarString short string has 1-byte length prefix`() {
         val result = PskReporterSender.encodeVarString("W1AW")
         assertThat(result.size).isEqualTo(5) // 1 byte len + 4 bytes
