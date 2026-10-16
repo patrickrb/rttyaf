@@ -305,7 +305,7 @@
 
         </androidx.recyclerview.widget.RecyclerView>
 
-        <com.k1af.ft8af.ui.SpectrumView
+        <com.k1af.rttyaf.ui.SpectrumView
             android:id="@+id/messageSpectrumView"
             android:layout_width="0dp"
             android:layout_height="match_parent"

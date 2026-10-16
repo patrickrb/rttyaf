@@ -1,4 +1,4 @@
-package com.k1af.ft8af.ui;
+package com.k1af.rttyaf.ui;
 /**
  * Settings screen.
  * @author BGY70Z
@@ -21,20 +21,20 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Observer;
 
-import com.k1af.ft8af.FAQActivity;
-import com.k1af.ft8af.Ft8Message;
-import com.k1af.ft8af.GeneralVariables;
-import com.k1af.ft8af.MainViewModel;
-import com.k1af.ft8af.R;
-import com.k1af.ft8af.connector.ConnectMode;
-import com.k1af.ft8af.database.ControlMode;
-import com.k1af.ft8af.database.OperationBand;
-import com.k1af.ft8af.database.RigNameList;
-import com.k1af.ft8af.databinding.FragmentConfigBinding;
-import com.k1af.ft8af.ft8signal.FT8Package;
-import com.k1af.ft8af.maidenhead.MaidenheadGrid;
-import com.k1af.ft8af.rigs.InstructionSet;
-import com.k1af.ft8af.timer.UtcTimer;
+import com.k1af.rttyaf.FAQActivity;
+import com.k1af.rttyaf.Ft8Message;
+import com.k1af.rttyaf.GeneralVariables;
+import com.k1af.rttyaf.MainViewModel;
+import com.k1af.rttyaf.R;
+import com.k1af.rttyaf.connector.ConnectMode;
+import com.k1af.rttyaf.database.ControlMode;
+import com.k1af.rttyaf.database.OperationBand;
+import com.k1af.rttyaf.database.RigNameList;
+import com.k1af.rttyaf.databinding.FragmentConfigBinding;
+import com.k1af.rttyaf.ft8signal.FT8Package;
+import com.k1af.rttyaf.maidenhead.MaidenheadGrid;
+import com.k1af.rttyaf.rigs.InstructionSet;
+import com.k1af.rttyaf.timer.UtcTimer;
 
 import java.io.IOException;
 

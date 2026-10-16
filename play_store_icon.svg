@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <!-- Play Store icon: the launcher-icon artwork (full semicircle signal
-       arcs over the AF-family center disc) at FT8AF's play-store proportions,
+       arcs over the AF-family center disc) at RTTYAF's play-store proportions,
        in RTTYAF's violet/pink palette. Render with:
          rsvg-convert -w 512 -h 512 play_store_icon.svg -o play_store_icon.png -->
   <defs>

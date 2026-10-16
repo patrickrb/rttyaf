@@ -1,12 +1,12 @@
-# FT8AF native module.
+# RTTYAF native module.
 #
-# Builds a single libft8af.so containing:
+# Builds a single librttyaf.so containing:
 #   - All FT8/FT4/FT2 DSP (encode, decode, FFT, resample, hash, GFSK)
 #   - USB Audio Class capture (libusb-backed)
 #
 # The prebuilt libft8cn.so is no longer used — all native functionality is
 # now built from the in-tree kgoba ft8_lib (pinned at 6f528128) and the
-# ft8af_glue JNI wrappers.
+# rttyaf_glue JNI wrappers.
 #
 # Why libusb: Android's UsbRequest API silently fails to drive
 # isochronous transfers on some kernels (notably automotive Android
@@ -16,7 +16,7 @@
 
 cmake_minimum_required(VERSION 3.18.1)
 
-project(ft8af_native)
+project(rttyaf_native)
 
 # ---------------------------------------------------------------------------
 # libusb 1.0.27 (static)
@@ -59,15 +59,15 @@ target_compile_options(usb1.0 PRIVATE
 )
 
 # ---------------------------------------------------------------------------
-# ft8af_dsp — from-source FT8/FT4/FT2 DSP (static)
+# rttyaf_dsp — from-source FT8/FT4/FT2 DSP (static)
 # ---------------------------------------------------------------------------
 # The full kgoba ft8_lib (pinned at 6f528128) including encode.c. All DSP
-# symbols are linked into the single libft8af.so shared library; no prebuilt
+# symbols are linked into the single librttyaf.so shared library; no prebuilt
 # dependency remains.
 
 set(FT8LIB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/ft8_lib)
 
-add_library(ft8af_dsp STATIC
+add_library(rttyaf_dsp STATIC
         ${FT8LIB_ROOT}/ft8/encode.c
         ${FT8LIB_ROOT}/ft8/decode.c
         ${FT8LIB_ROOT}/ft8/ldpc.c
@@ -83,51 +83,51 @@ add_library(ft8af_dsp STATIC
         ${FT8LIB_ROOT}/fft/kiss_fftr.c
 )
 
-target_include_directories(ft8af_dsp PUBLIC ${FT8LIB_ROOT})
+target_include_directories(rttyaf_dsp PUBLIC ${FT8LIB_ROOT})
 
-target_compile_options(ft8af_dsp PRIVATE
+target_compile_options(rttyaf_dsp PRIVATE
         -Wno-unused-function
 )
 
 # ---------------------------------------------------------------------------
-# libft8af.so — unified JNI bridge (replaces both libft8cn.so and libft8af_usb.so)
+# librttyaf.so — unified JNI bridge (replaces both libft8cn.so and librttyaf_usb.so)
 # ---------------------------------------------------------------------------
 
-add_library(ft8af SHARED
+add_library(rttyaf SHARED
         # USB audio
         usb_audio.cpp
         usb_audio_capture.cpp
         # GFSK synthesis
-        ft8af_glue/gfsk.c
+        rttyaf_glue/gfsk.c
         # JNI wrappers — encode/pack/GFSK
-        ft8af_glue/ft8_encode_jni.cpp
+        rttyaf_glue/ft8_encode_jni.cpp
         # JNI wrappers — callsign hash
-        ft8af_glue/ft8_hash_jni.cpp
+        rttyaf_glue/ft8_hash_jni.cpp
         # JNI wrappers — FFT display
-        ft8af_glue/ft8_fft_jni.cpp
-        ft8af_glue/fft_display.c
+        rttyaf_glue/ft8_fft_jni.cpp
+        rttyaf_glue/fft_display.c
         # JNI wrappers — audio resampler
-        ft8af_glue/ft8_resample_jni.cpp
+        rttyaf_glue/ft8_resample_jni.cpp
         # JNI wrappers — FT8 decoder (replaces prebuilt)
-        ft8af_glue/ft8_decode_jni.cpp
+        rttyaf_glue/ft8_decode_jni.cpp
         # Deep-decode signal subtraction (shared with host bench + desktop)
-        ft8af_glue/ft8_subtract.c
+        rttyaf_glue/ft8_subtract.c
         # Fine-sync coherent demod retry (shared with host bench)
-        ft8af_glue/ft8_fine.c
+        rttyaf_glue/ft8_fine.c
         # Cross-slot decoding: LLR accumulation + message-history retry
-        ft8af_glue/ft8_xslot.c
-        # JNI wrappers — FT2/FT4 decoder (from-source, was in ft8af_usb)
-        ft8af_glue/ft2_decode_jni.cpp
+        rttyaf_glue/ft8_xslot.c
+        # JNI wrappers — FT2/FT4 decoder (from-source, was in rttyaf_usb)
+        rttyaf_glue/ft2_decode_jni.cpp
 )
 
-target_include_directories(ft8af PRIVATE ${FT8LIB_ROOT})
+target_include_directories(rttyaf PRIVATE ${FT8LIB_ROOT})
 
 find_library(log-lib log)
 
-target_link_options(ft8af PRIVATE "-Wl,-z,max-page-size=16384")
+target_link_options(rttyaf PRIVATE "-Wl,-z,max-page-size=16384")
 
-target_link_libraries(ft8af
+target_link_libraries(rttyaf
         usb1.0
-        ft8af_dsp
+        rttyaf_dsp
         ${log-lib}
 )

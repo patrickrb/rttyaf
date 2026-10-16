@@ -60,7 +60,7 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/flexInfoTextView">
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/sMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="20dp"
@@ -72,7 +72,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/alcMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="20dp"
@@ -84,7 +84,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/sMeterRulerView" />
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/swrMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="20dp"
@@ -96,7 +96,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/alcMeterRulerView" />
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/powerMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="20dp"
@@ -108,7 +108,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/swrMeterRulerView" />
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/tempMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="20dp"
@@ -133,7 +133,7 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/constraintLayout2">
 
-                <com.k1af.ft8af.ui.VolumeProgress
+                <com.k1af.rttyaf.ui.VolumeProgress
                     android:id="@+id/maxPowerProgress"
                     android:layout_width="0dp"
                     android:layout_height="15dp"
@@ -223,7 +223,7 @@
                     app:layout_constraintEnd_toStartOf="@+id/pttOffButton"
                     app:layout_constraintTop_toBottomOf="@+id/tunePowerSeekBar" />
 
-                <com.k1af.ft8af.ui.VolumeProgress
+                <com.k1af.rttyaf.ui.VolumeProgress
                     android:id="@+id/tunePowerProgress"
                     android:layout_width="0dp"
                     android:layout_height="15dp"

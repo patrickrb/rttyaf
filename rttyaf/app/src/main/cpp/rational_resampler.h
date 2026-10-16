@@ -17,12 +17,12 @@
 // is baked in).
 //
 // Header-only and free of JNI/libusb/Android deps on purpose, so the DSP can
-// be unit-tested on the host (see ft8af_glue/test_rational_resampler.cpp +
+// be unit-tested on the host (see rttyaf_glue/test_rational_resampler.cpp +
 // run_host_tests). RationalResampler.java is a line-for-line port for the
 // UsbRequest fallback capture path — keep the two in sync.
 
-#ifndef FT8AF_RATIONAL_RESAMPLER_H
-#define FT8AF_RATIONAL_RESAMPLER_H
+#ifndef RTTYAF_RATIONAL_RESAMPLER_H
+#define RTTYAF_RATIONAL_RESAMPLER_H
 
 #include <algorithm>
 #include <cmath>
@@ -187,4 +187,4 @@ private:
     std::int64_t nextT_ = 0;
 };
 
-#endif  // FT8AF_RATIONAL_RESAMPLER_H
+#endif  // RTTYAF_RATIONAL_RESAMPLER_H

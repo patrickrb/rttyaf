@@ -224,7 +224,7 @@
                 app:layout_constraintGuide_begin="75dp" />
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <com.k1af.ft8af.ui.SpectrumView
+        <com.k1af.rttyaf.ui.SpectrumView
             android:id="@+id/spectrumView"
             android:layout_width="0dp"
             android:layout_height="0dp"

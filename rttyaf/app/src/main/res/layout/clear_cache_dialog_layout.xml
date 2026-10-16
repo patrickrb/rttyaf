@@ -19,7 +19,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:srcCompat="@drawable/ft8af_icon" />
+        app:srcCompat="@drawable/rttyaf_icon" />
 
 
     <ImageView
@@ -88,7 +88,7 @@
         app:layout_constraintEnd_toStartOf="@+id/image"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/image"
-        tools:text="FT8AF" />
+        tools:text="RTTYAF" />
 
     <TextView
         android:id="@+id/buildVersionTextView"
