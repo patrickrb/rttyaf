@@ -37,6 +37,34 @@ class AppNameLocalizationTest {
         return re.find(file.readText())?.groupValues?.get(1)
     }
 
+    /**
+     * Every string resource file in every locale, not just `strings.xml`: the
+     * Compose UI reads `strings_compose.xml`, which is where "EXIT FT8AF?" hid
+     * from the first version of this test and reached a tester.
+     */
+    private fun allStringFiles(): List<Pair<String, File>> =
+        resDir.listFiles { f -> f.isDirectory && f.name.startsWith("values") }
+            .orEmpty()
+            .flatMap { dir ->
+                dir.listFiles { f -> f.isFile && f.name.endsWith(".xml") }.orEmpty()
+                    .map { "${dir.name}/${it.name}" to it }
+            }
+
+    @Test
+    fun noUserFacingStringInAnyLocaleSaysFt8af() {
+        // The upstream author's bug-report address is the one deliberate holdout
+        // until RTTYAF has its own contact; it is not shown as a brand.
+        val allowed = setOf("bug_report_email")
+        val re = Regex("""<string name="([^"]+)"[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)
+        for ((where, file) in allStringFiles()) {
+            for (m in re.findAll(file.readText())) {
+                val (name, value) = m.destructured
+                if (name in allowed) continue
+                assertWithMessage("$name in $where").that(value).doesNotContain("FT8AF")
+            }
+        }
+    }
+
     @Test
     fun defaultLocaleDefinesTheRttyafName() {
         val default = stringFiles().getValue("")
