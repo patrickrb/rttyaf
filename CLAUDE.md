@@ -1,4 +1,4 @@
-# FT8AF Project Instructions
+# RTTYAF Project Instructions
 
 > **Placeholders.** This file is written for any contributor's machine.
 > Substitute your own values wherever you see `<…>`. The recurring ones:
@@ -52,11 +52,11 @@ git worktree add ../<checkout-dir-name>-<short-task-name> -b feat/<task>
 
 Notes for a fresh worktree:
 
-- RTTYAF is a pure-Kotlin/JVM app: the RTTY modem lives in
-  `rttyaf/app/src/main/kotlin/radio/ks3ckc/ft8af/rtty/` and there are **no
-  native (`cpp/`) sources** to copy — a fresh worktree builds as-is. (The
-  FT8AF `ft8_lib`/`ft8af_glue` native tree was removed in the fork.)
-- Build/install from inside the worktree's `ft8af` dir: Windows uses the wrapper
+- The RTTY modem is pure Kotlin (`rttyaf/app/src/main/kotlin/radio/ks3ckc/rttyaf/rtty/`).
+  The FT8 DSP (`ft8_lib`) and the `rttyaf_glue` JNI / USB-audio sources under
+  `rttyaf/app/src/main/cpp/` build from source via CMake into `librttyaf.so`;
+  nothing needs copying — a fresh worktree builds as-is.
+- Build/install from inside the worktree's `rttyaf` dir: Windows uses the wrapper
   (`cmd.exe /c "gradlew.bat installDebug"`); macOS uses `./gradlew` (see Build &
   Deploy for the JDK 17 requirement). Both can install to an attached device.
 
@@ -76,13 +76,13 @@ extract the decision/geometry logic into a plain top-level `internal` function
 or class (e.g. `buildQsoLog`, `QsoPathProjection`) and test that. Keep the
 Composable a thin wrapper that just calls the extracted logic.
 
-Tests live in `ft8af/app/src/test/` (Kotlin under `.../kotlin`, Java under
+Tests live in `rttyaf/app/src/test/` (Kotlin under `.../kotlin`, Java under
 `.../java`), use JUnit4 + Truth (`assertThat`), and add
 `@RunWith(RobolectricTestRunner::class)` when the code under test touches
 Android/Play-Services types (e.g. anything reaching `MaidenheadGrid`,
 `GeneralVariables`, `LatLng`). Pure math/logic needs no runner.
 
-Run from the `ft8af` dir.
+Run from the `rttyaf` dir.
 
 **Windows:**
 
@@ -111,7 +111,7 @@ when one is attached.
 Studio JBR automatically:
 
 ```
-cd ft8af && cmd.exe /c "gradlew.bat installDebug"
+cd rttyaf && cmd.exe /c "gradlew.bat installDebug"
 ```
 
 **macOS:** AGP 8.7.3 / Gradle 8.9 need **JDK 17**; if your system JDK is older,
@@ -123,7 +123,7 @@ emulator); to target only the phone, build the APK and push it with an explicit
 serial:
 
 ```
-cd ft8af && JAVA_HOME=<jdk17-home> ./gradlew assembleDebug
+cd rttyaf && JAVA_HOME=<jdk17-home> ./gradlew assembleDebug
 adb -s <phone-serial> install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
@@ -145,21 +145,21 @@ its serial (from `adb devices`). If `adb` isn't on your PATH, it lives at
 ## Debug logs
 
 The app writes a structured event log to
-`/sdcard/Android/data/radio.ks3ckc.ft8af/files/debug.log` via `fileLog()` in
+`/sdcard/Android/data/radio.ks3ckc.rttyaf/files/debug.log` via `fileLog()` in
 `ComposeMainActivity.kt` — CAT serial sends/recvs, USB attach events,
 autoConnect attempts, band/frequency changes, etc. This is usually the most
 useful source. Pull it with:
 
 ```
-adb -s <phone-serial> pull /sdcard/Android/data/radio.ks3ckc.ft8af/files/debug.log /tmp/
+adb -s <phone-serial> pull /sdcard/Android/data/radio.ks3ckc.rttyaf/files/debug.log /tmp/
 ```
 
 For runtime detail not in `debug.log` (audio recording loop, system USB events,
 crashes), use `adb logcat`. Useful tags: `FT8SignalListener`, `MicRecorder`,
 `UsbAudioDevice`, `CableConnector`, `CableSerialPort`, `UsbHostManager`,
-`UsbAlsaManager`. The app's `applicationId` is `radio.ks3ckc.ft8af` (the same
-for every contributor — it's set in `ft8af/app/build.gradle`) — pid-filter with
-`adb -s <phone-serial> logcat --pid=$(adb -s <phone-serial> shell pidof radio.ks3ckc.ft8af)`
+`UsbAlsaManager`. The app's `applicationId` is `radio.ks3ckc.rttyaf` (the same
+for every contributor — it's set in `rttyaf/app/build.gradle`) — pid-filter with
+`adb -s <phone-serial> logcat --pid=$(adb -s <phone-serial> shell pidof radio.ks3ckc.rttyaf)`
 when you only want app-internal lines.
 
 ## FT8 TX audio pipeline
@@ -173,7 +173,7 @@ audio is audible, ALC looks right, and zero spots appear on PSKReporter.
 freq, 12000)` returns a mono 12.64-second `float[]` at 12 kHz containing the full
 FT8 message. The Costas sync arrays at symbols 0-6, 36-42, 72-78 are
 embedded by `synth_gfsk` in the native lib — today that's the from-source
-`libft8af.so` (`System.loadLibrary("ft8af")`, built from the vendored
+`librttyaf.so` (`System.loadLibrary("rttyaf")`, built from the vendored
 `ft8_lib`; historically this was the retired closed prebuilt `libft8cn.so`).
 The buffer is correct as generated — everything
 downstream just has to *not break it*.

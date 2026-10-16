@@ -38,10 +38,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:localeConfig="@xml/locales_config"
-        android:theme="@style/Theme.Ft8AF">
+        android:theme="@style/Theme.Rttyaf">
         <!-- New Compose-based main activity -->
         <activity
-            android:name="radio.ks3ckc.ft8af.ComposeMainActivity"
+            android:name="radio.ks3ckc.rttyaf.ComposeMainActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|screenLayout|uiMode">

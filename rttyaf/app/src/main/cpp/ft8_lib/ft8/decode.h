@@ -81,7 +81,7 @@ bool ft8_decode_osd(const waterfall_t* power, const candidate_t* cand, int max_i
 /// The BP (+ optional OSD) + CRC + unpack stage of ft8_decode_osd for
 /// caller-provided log-likelihoods (174 entries, log p(1)/p(0), any scale —
 /// normalized internally). Lets an external demodulator (e.g. the fine-sync
-/// coherent demod in ft8af_glue/ft8_fine.c) reuse the decode chain without a
+/// coherent demod in rttyaf_glue/ft8_fine.c) reuse the decode chain without a
 /// waterfall. protocol selects the FT4/FT2 payload XOR de-scramble.
 bool ftx_decode_llrs(ftx_protocol_t protocol, const float* llrs, int max_iterations,
                      int osd_depth, int osd_err_gate, ftx_message_t* message, decode_status_t* status);

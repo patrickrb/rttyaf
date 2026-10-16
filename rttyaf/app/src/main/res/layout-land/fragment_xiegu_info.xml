@@ -60,7 +60,7 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/xieguInfoTextView">
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/xieguSMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="28dp"
@@ -72,7 +72,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/xieguAlcMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="28dp"
@@ -84,7 +84,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/xieguSMeterRulerView" />
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/xieguSwrMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="28dp"
@@ -96,7 +96,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/xieguAlcMeterRulerView" />
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/xieguPowerMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="28dp"
@@ -108,7 +108,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/xieguSwrMeterRulerView" />
 
-                <com.k1af.ft8af.ui.FlexMeterRulerView
+                <com.k1af.rttyaf.ui.FlexMeterRulerView
                     android:id="@+id/xieguVoltMeterRulerView"
                     android:layout_width="0dp"
                     android:layout_height="28dp"
@@ -144,7 +144,7 @@
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
-                <com.k1af.ft8af.ui.VolumeProgress
+                <com.k1af.rttyaf.ui.VolumeProgress
                     android:id="@+id/xieguMaxPwrProgress"
                     android:layout_width="0dp"
                     android:layout_height="15dp"

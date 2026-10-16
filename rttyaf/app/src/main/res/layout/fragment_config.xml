@@ -458,7 +458,7 @@
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintTop_toTopOf="parent" />
 
-                        <com.k1af.ft8af.ui.RadioGroupFt8af
+                        <com.k1af.rttyaf.ui.RadioGroupRttyaf
                             android:id="@+id/audioBitsRadioGroup"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -496,9 +496,9 @@
                                 app:layout_constraintBottom_toBottomOf="@+id/audio16BitsRadioButton"
                                 app:layout_constraintStart_toEndOf="@+id/audio16BitsRadioButton"
                                 app:layout_constraintTop_toTopOf="@+id/audio16BitsRadioButton" />
-                        </com.k1af.ft8af.ui.RadioGroupFt8af>
+                        </com.k1af.rttyaf.ui.RadioGroupRttyaf>
 
-                        <com.k1af.ft8af.ui.RadioGroupFt8af
+                        <com.k1af.rttyaf.ui.RadioGroupRttyaf
                             android:id="@+id/audioRateRadioGroup"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -554,7 +554,7 @@
                                 app:layout_constraintBottom_toBottomOf="parent"
                                 app:layout_constraintStart_toEndOf="@+id/audioOutputText"
                                 app:layout_constraintTop_toTopOf="parent" />
-                        </com.k1af.ft8af.ui.RadioGroupFt8af>
+                        </com.k1af.rttyaf.ui.RadioGroupRttyaf>
 
                         <ImageButton
                             android:id="@+id/audioOutputImageButton"
@@ -1117,7 +1117,7 @@
                             app:srcCompat="@drawable/ic_baseline_info_32"
                             tools:ignore="TouchTargetSizeCheck" />
 
-                        <com.k1af.ft8af.ui.RadioGroupFt8af
+                        <com.k1af.rttyaf.ui.RadioGroupRttyaf
                             android:id="@+id/messageModeRadioGroup"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -1147,7 +1147,7 @@
                                 android:textSize="12sp" />
 
 
-                        </com.k1af.ft8af.ui.RadioGroupFt8af>
+                        </com.k1af.rttyaf.ui.RadioGroupRttyaf>
 
                     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -1194,7 +1194,7 @@
                             app:srcCompat="@drawable/ic_baseline_info_32"
                             tools:ignore="TouchTargetSizeCheck" />
 
-                        <com.k1af.ft8af.ui.RadioGroupFt8af
+                        <com.k1af.rttyaf.ui.RadioGroupRttyaf
                             android:id="@+id/controlModeRadioGroup"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -1240,7 +1240,7 @@
                                 android:text="@string/DTR"
                                 android:textColor="@color/text_view_color"
                                 android:textSize="12sp" />
-                        </com.k1af.ft8af.ui.RadioGroupFt8af>
+                        </com.k1af.rttyaf.ui.RadioGroupRttyaf>
 
                     </androidx.constraintlayout.widget.ConstraintLayout>
 
@@ -1281,7 +1281,7 @@
                             app:srcCompat="@drawable/ic_baseline_info_32"
                             tools:ignore="TouchTargetSizeCheck" />
 
-                        <com.k1af.ft8af.ui.RadioGroupFt8af
+                        <com.k1af.rttyaf.ui.RadioGroupRttyaf
                             android:id="@+id/connectModeRadioGroup"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -1319,7 +1319,7 @@
                                 android:textColor="@color/text_view_color"
                                 android:textSize="12sp" />
 
-                        </com.k1af.ft8af.ui.RadioGroupFt8af>
+                        </com.k1af.rttyaf.ui.RadioGroupRttyaf>
 
                     </androidx.constraintlayout.widget.ConstraintLayout>
                     <androidx.constraintlayout.widget.ConstraintLayout
@@ -1625,7 +1625,7 @@
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintTop_toTopOf="parent" />
 
-                        <com.k1af.ft8af.ui.RadioGroupFt8af
+                        <com.k1af.rttyaf.ui.RadioGroupRttyaf
                             android:id="@+id/decodeModeRadioGroup"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -1656,7 +1656,7 @@
 
 
 
-                    </com.k1af.ft8af.ui.RadioGroupFt8af>
+                    </com.k1af.rttyaf.ui.RadioGroupRttyaf>
 
 
                         <ImageButton

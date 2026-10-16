@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <baseline version="1.0">
-    <file name="src/androidTest/kotlin/com/k1af/ft8af/AppSmokeTest.kt">
+    <file name="src/androidTest/kotlin/com/k1af/rttyaf/AppSmokeTest.kt">
         <error line="24" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="35" column="47" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/BluetoothAutoConnect.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/BluetoothAutoConnect.kt">
         <error line="57" column="5" source="standard:spacing-between-declarations-with-comments" />
         <error line="59" column="5" source="standard:spacing-between-declarations-with-comments" />
         <error line="61" column="5" source="standard:spacing-between-declarations-with-comments" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ComposeMainActivity.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ComposeMainActivity.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="70" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="133" column="45" source="standard:wrapping" />
@@ -95,7 +95,7 @@
         <error line="745" column="14" source="standard:wrapping" />
         <error line="746" column="63" source="standard:wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/FT8AFApp.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/Ft8App.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="4" column="1" source="standard:no-unused-imports" />
         <error line="84" column="37" source="standard:function-signature" />
@@ -119,7 +119,7 @@
         <error line="468" column="34" source="standard:if-else-wrapping" />
         <error line="468" column="34" source="standard:multiline-if-else" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/PerBandOutputLevel.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/PerBandOutputLevel.kt">
         <error line="24" column="1" source="standard:no-consecutive-comments" />
         <error line="101" column="62" source="standard:function-signature" />
         <error line="112" column="35" source="standard:function-signature" />
@@ -133,14 +133,14 @@
         <error line="144" column="55" source="standard:multiline-expression-wrapping" />
         <error line="144" column="55" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/UsbPermissionIntents.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/UsbPermissionIntents.kt">
         <error line="31" column="31" source="standard:function-signature" />
         <error line="31" column="49" source="standard:function-signature" />
         <error line="31" column="63" source="standard:function-signature" />
         <error line="32" column="18" source="standard:multiline-expression-wrapping" />
         <error line="35" column="17" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pota/PotaActivationDao.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pota/PotaActivationDao.kt">
         <error line="18" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="19" column="39" source="standard:function-signature" />
         <error line="22" column="25" source="standard:function-signature" />
@@ -153,7 +153,7 @@
         <error line="102" column="19" source="standard:multiline-expression-wrapping" />
         <error line="107" column="22" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pota/PotaAuth.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pota/PotaAuth.kt">
         <error line="93" column="1" source="standard:spacing-between-declarations-with-annotations" />
         <error line="124" column="25" source="standard:multiline-expression-wrapping" />
         <error line="143" column="35" source="standard:function-signature" />
@@ -205,7 +205,7 @@
         <error line="365" column="27" source="standard:multiline-expression-wrapping" />
         <error line="375" column="51" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pota/PotaClient.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pota/PotaClient.kt">
         <error line="51" column="69" source="standard:multiline-expression-wrapping" />
         <error line="51" column="69" source="standard:function-signature" />
         <error line="121" column="18" source="standard:multiline-expression-wrapping" />
@@ -236,13 +236,13 @@
         <error line="343" column="20" source="standard:multiline-expression-wrapping" />
         <error line="368" column="47" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pota/PotaCqClassifier.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pota/PotaCqClassifier.kt">
         <error line="30" column="18" source="standard:multiline-expression-wrapping" />
         <error line="30" column="18" source="standard:function-signature" />
         <error line="38" column="46" source="standard:multiline-expression-wrapping" />
         <error line="38" column="46" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pota/PotaParkRepository.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pota/PotaParkRepository.kt">
         <error line="26" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="63" column="29" source="standard:function-signature" />
         <error line="63" column="46" source="standard:function-signature" />
@@ -251,7 +251,7 @@
         <error line="83" column="60" source="standard:multiline-expression-wrapping" />
         <error line="83" column="60" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pota/PotaSessionManager.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pota/PotaSessionManager.kt">
         <error line="47" column="15" source="standard:function-signature" />
         <error line="47" column="39" source="standard:function-signature" />
         <error line="47" column="53" source="standard:function-signature" />
@@ -264,10 +264,10 @@
         <error line="118" column="56" source="standard:function-signature" />
         <error line="118" column="79" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pota/PotaSpotsRepository.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pota/PotaSpotsRepository.kt">
         <error line="47" column="15" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pskreporter/PskReporterClient.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pskreporter/PskReporterClient.kt">
         <error line="35" column="1" source="standard:blank-line-before-declaration" />
         <error line="35" column="1" source="standard:no-consecutive-comments" />
         <error line="75" column="1" source="standard:spacing-between-declarations-with-annotations" />
@@ -298,7 +298,7 @@
         <error line="212" column="34" source="standard:trailing-comma-on-call-site" />
         <error line="244" column="47" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/pskreporter/PskReporterSender.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/pskreporter/PskReporterSender.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="8" column="1" source="standard:no-wildcard-imports" />
         <error line="36" column="57" source="standard:no-multi-spaces" />
@@ -352,7 +352,7 @@
         <error line="446" column="72" source="standard:parameter-list-wrapping" />
         <error line="446" column="72" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/qrz/QrzWebClient.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/qrz/QrzWebClient.kt">
         <error line="40" column="32" source="standard:multiline-expression-wrapping" />
         <error line="44" column="30" source="standard:multiline-expression-wrapping" />
         <error line="48" column="38" source="standard:multiline-expression-wrapping" />
@@ -362,7 +362,7 @@
         <error line="78" column="29" source="standard:multiline-expression-wrapping" />
         <error line="100" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/qrz/QrzXmlClient.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/qrz/QrzXmlClient.kt">
         <error line="46" column="1" source="standard:spacing-between-declarations-with-annotations" />
         <error line="61" column="44" source="standard:multiline-expression-wrapping" />
         <error line="61" column="44" source="standard:function-signature" />
@@ -379,7 +379,7 @@
         <error line="195" column="26" source="standard:multiline-expression-wrapping" />
         <error line="220" column="47" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/sync/QsoAutoSync.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/sync/QsoAutoSync.kt">
         <error line="37" column="19" source="standard:function-signature" />
         <error line="37" column="30" source="standard:function-signature" />
         <error line="37" column="56" source="standard:function-signature" />
@@ -387,7 +387,7 @@
         <error line="75" column="28" source="standard:multiline-expression-wrapping" />
         <error line="91" column="23" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/theme/Color.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/theme/Color.kt">
         <error line="52" column="19" source="standard:multiline-expression-wrapping" />
         <error line="58" column="1" source="standard:no-blank-line-in-list" />
         <error line="59" column="33" source="standard:no-multi-spaces" />
@@ -410,7 +410,7 @@
         <error line="99" column="37" source="standard:no-multi-spaces" />
         <error line="150" column="36" source="standard:no-multi-spaces" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/theme/FT8AFTheme.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/theme/RttyafTheme.kt">
         <error line="21" column="16" source="standard:multiline-expression-wrapping" />
         <error line="31" column="1" source="standard:no-blank-line-in-list" />
         <error line="36" column="1" source="standard:no-blank-line-in-list" />
@@ -422,11 +422,11 @@
         <error line="60" column="1" source="standard:no-blank-line-in-list" />
         <error line="108" column="5" source="standard:function-naming" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/theme/Shape.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/theme/Shape.kt">
         <error line="7" column="19" source="standard:multiline-expression-wrapping" />
         <error line="12" column="43" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/theme/ThemePreference.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/theme/ThemePreference.kt">
         <error line="39" column="46" source="standard:function-signature" />
         <error line="65" column="15" source="standard:function-signature" />
         <error line="65" column="33" source="standard:function-signature" />
@@ -436,7 +436,7 @@
         <error line="81" column="14" source="standard:if-else-wrapping" />
         <error line="81" column="14" source="standard:multiline-if-else" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/theme/Type.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/theme/Type.kt">
         <error line="11" column="31" source="standard:multiline-expression-wrapping" />
         <error line="18" column="35" source="standard:multiline-expression-wrapping" />
         <error line="25" column="23" source="standard:multiline-expression-wrapping" />
@@ -456,7 +456,7 @@
         <error line="98" column="19" source="standard:multiline-expression-wrapping" />
         <error line="104" column="18" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/ActiveQsoPanel.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/ActiveQsoPanel.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="49" column="1" source="standard:no-wildcard-imports" />
         <error line="107" column="22" source="standard:multiline-expression-wrapping" />
@@ -521,7 +521,7 @@
         <error line="702" column="34" source="standard:multiline-if-else" />
         <error line="702" column="42" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/AnimatedCounter.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/AnimatedCounter.kt">
         <error line="23" column="5" source="standard:function-naming" />
         <error line="35" column="34" source="standard:multiline-expression-wrapping" />
         <error line="39" column="33" source="standard:multiline-expression-wrapping" />
@@ -530,7 +530,7 @@
         <error line="43" column="105" source="standard:trailing-comma-on-call-site" />
         <error line="47" column="47" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/CatStatusChip.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/CatStatusChip.kt">
         <error line="33" column="1" source="standard:no-wildcard-imports" />
         <error line="50" column="74" source="standard:multiline-expression-wrapping" />
         <error line="50" column="74" source="standard:function-signature" />
@@ -552,7 +552,7 @@
         <error line="127" column="29" source="standard:multiline-expression-wrapping" />
         <error line="138" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/CqOptionsSheet.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/CqOptionsSheet.kt">
         <error line="37" column="1" source="standard:no-wildcard-imports" />
         <error line="43" column="53" source="standard:function-signature" />
         <error line="49" column="54" source="standard:function-signature" />
@@ -586,12 +586,12 @@
         <error line="458" column="13" source="standard:function-naming" />
         <error line="460" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/EmptyStateWaves.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/EmptyStateWaves.kt">
         <error line="37" column="5" source="standard:function-naming" />
         <error line="47" column="25" source="standard:multiline-expression-wrapping" />
         <error line="65" column="25" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/ExitConfirmDialog.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/ExitConfirmDialog.kt">
         <error line="41" column="5" source="standard:function-naming" />
         <error line="50" column="22" source="standard:multiline-expression-wrapping" />
         <error line="56" column="24" source="standard:multiline-expression-wrapping" />
@@ -600,7 +600,7 @@
         <error line="123" column="13" source="standard:function-naming" />
         <error line="129" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/FT8AFBottomSheet.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/RttyafBottomSheet.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="41" column="1" source="standard:no-wildcard-imports" />
         <error line="44" column="5" source="standard:function-naming" />
@@ -616,14 +616,14 @@
         <error line="179" column="80" source="standard:function-signature" />
         <error line="179" column="92" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/FT8AFIconButton.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/RttyafIconButton.kt">
         <error line="33" column="5" source="standard:function-naming" />
         <error line="49" column="29" source="standard:multiline-expression-wrapping" />
         <error line="52" column="14" source="standard:trailing-comma-on-call-site" />
         <error line="57" column="20" source="standard:multiline-expression-wrapping" />
         <error line="65" column="18" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/FT8AFIcons.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/RttyafIcons.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="10" column="1" source="standard:no-unused-imports" />
         <error line="15" column="1" source="standard:no-unused-imports" />
@@ -680,13 +680,13 @@
         <error line="464" column="25" source="standard:multiline-expression-wrapping" />
         <error line="480" column="48" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/FilterChips.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/FilterChips.kt">
         <error line="21" column="1" source="standard:no-wildcard-imports" />
         <error line="24" column="5" source="standard:function-naming" />
         <error line="34" column="20" source="standard:multiline-expression-wrapping" />
         <error line="46" column="28" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/FrequencyPickerSheet.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/FrequencyPickerSheet.kt">
         <error line="35" column="1" source="standard:no-wildcard-imports" />
         <error line="44" column="21" source="standard:function-signature" />
         <error line="44" column="51" source="standard:function-signature" />
@@ -713,18 +713,18 @@
         <error line="343" column="13" source="standard:function-naming" />
         <error line="351" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/GlassCard.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/GlassCard.kt">
         <error line="7" column="1" source="standard:no-unused-imports" />
         <error line="17" column="1" source="standard:no-wildcard-imports" />
         <error line="20" column="5" source="standard:function-naming" />
         <error line="28" column="20" source="standard:multiline-expression-wrapping" />
         <error line="35" column="29" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/HoundSetupSheet.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/HoundSetupSheet.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="30" column="5" source="standard:function-naming" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/InputLevelIndicator.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/InputLevelIndicator.kt">
         <error line="53" column="66" source="standard:multiline-expression-wrapping" />
         <error line="53" column="66" source="standard:function-signature" />
         <error line="64" column="52" source="standard:function-signature" />
@@ -736,7 +736,7 @@
         <error line="151" column="65" source="standard:multiline-expression-wrapping" />
         <error line="151" column="65" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/IntSlider.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/IntSlider.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="35" column="34" source="standard:function-signature" />
         <error line="35" column="49" source="standard:function-signature" />
@@ -760,7 +760,7 @@
         <error line="136" column="57" source="standard:argument-list-wrapping" />
         <error line="137" column="41" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/PressableScale.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/PressableScale.kt">
         <error line="27" column="15" source="standard:multiline-expression-wrapping" />
         <error line="27" column="15" source="standard:function-signature" />
         <error line="46" column="38" source="standard:trailing-comma-on-call-site" />
@@ -771,7 +771,7 @@
         <error line="67" column="53" source="standard:trailing-comma-on-call-site" />
         <error line="68" column="14" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/QsoCelebration.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/QsoCelebration.kt">
         <error line="33" column="5" source="standard:function-naming" />
         <error line="40" column="22" source="standard:multiline-expression-wrapping" />
         <error line="88" column="26" source="standard:multiline-expression-wrapping" />
@@ -779,19 +779,19 @@
         <error line="114" column="27" source="standard:multiline-expression-wrapping" />
         <error line="135" column="25" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/SettingsRow.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/SettingsRow.kt">
         <error line="15" column="1" source="standard:no-wildcard-imports" />
         <error line="22" column="5" source="standard:function-naming" />
         <error line="33" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/ShimmerBox.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/ShimmerBox.kt">
         <error line="31" column="5" source="standard:function-naming" />
         <error line="41" column="25" source="standard:multiline-expression-wrapping" />
         <error line="49" column="20" source="standard:multiline-expression-wrapping" />
         <error line="60" column="33" source="standard:multiline-expression-wrapping" />
         <error line="67" column="14" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/SignalBar.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/SignalBar.kt">
         <error line="17" column="1" source="standard:no-wildcard-imports" />
         <error line="24" column="5" source="standard:function-naming" />
         <error line="33" column="17" source="standard:multiline-expression-wrapping" />
@@ -802,7 +802,7 @@
         <error line="52" column="28" source="standard:multiline-expression-wrapping" />
         <error line="56" column="71" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/SlotTimerBar.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/SlotTimerBar.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="35" column="5" source="standard:function-naming" />
         <error line="53" column="20" source="standard:multiline-expression-wrapping" />
@@ -812,7 +812,7 @@
         <error line="111" column="42" source="standard:function-signature" />
         <error line="111" column="58" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/StatusPill.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/StatusPill.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="24" column="1" source="standard:no-wildcard-imports" />
         <error line="36" column="28" source="standard:no-multi-spaces" />
@@ -833,7 +833,7 @@
         <error line="122" column="24" source="standard:multiline-expression-wrapping" />
         <error line="125" column="42" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/TabBar.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/TabBar.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="38" column="1" source="standard:no-wildcard-imports" />
         <error line="43" column="21" source="standard:parameter-list-wrapping" />
@@ -848,20 +848,20 @@
         <error line="161" column="32" source="standard:multiline-expression-wrapping" />
         <error line="164" column="22" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/Toggle.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/Toggle.kt">
         <error line="21" column="1" source="standard:no-wildcard-imports" />
         <error line="27" column="5" source="standard:function-naming" />
         <error line="48" column="20" source="standard:multiline-expression-wrapping" />
         <error line="60" column="24" source="standard:multiline-expression-wrapping" />
         <error line="64" column="88" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/TopBar.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/TopBar.kt">
         <error line="20" column="5" source="standard:function-naming" />
         <error line="27" column="20" source="standard:multiline-expression-wrapping" />
         <error line="36" column="25" source="standard:multiline-expression-wrapping" />
         <error line="56" column="5" source="standard:function-naming" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/TransmitGlow.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/TransmitGlow.kt">
         <error line="24" column="1" source="standard:no-unused-imports" />
         <error line="42" column="5" source="standard:function-naming" />
         <error line="61" column="29" source="standard:multiline-expression-wrapping" />
@@ -874,7 +874,7 @@
         <error line="90" column="33" source="standard:multiline-expression-wrapping" />
         <error line="109" column="18" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/TxStrip.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/TxStrip.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="44" column="1" source="standard:no-wildcard-imports" />
         <error line="67" column="26" source="standard:function-signature" />
@@ -928,10 +928,10 @@
         <error line="593" column="24" source="standard:multiline-expression-wrapping" />
         <error line="596" column="35" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/components/Wordmark.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/components/Wordmark.kt">
         <error line="22" column="5" source="standard:function-naming" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/decode/DecodeRow.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/decode/DecodeRow.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="37" column="1" source="standard:no-wildcard-imports" />
         <error line="62" column="5" source="standard:function-naming" />
@@ -969,7 +969,7 @@
         <error line="362" column="19" source="standard:multiline-expression-wrapping" />
         <error line="365" column="19" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/decode/DecodeScreen.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/decode/DecodeScreen.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="42" column="1" source="standard:no-wildcard-imports" />
         <error line="54" column="5" source="standard:function-naming" />
@@ -1013,14 +1013,14 @@
         <error line="493" column="141" source="standard:max-line-length" />
         <error line="493" column="165" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/decode/QrzAvatar.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/decode/QrzAvatar.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="37" column="5" source="standard:function-naming" />
         <error line="54" column="20" source="standard:multiline-expression-wrapping" />
         <error line="63" column="25" source="standard:multiline-expression-wrapping" />
         <error line="69" column="28" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/decode/QsoPathProjection.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/decode/QsoPathProjection.kt">
         <error line="63" column="26" source="standard:function-signature" />
         <error line="63" column="42" source="standard:function-signature" />
         <error line="63" column="53" source="standard:function-signature" />
@@ -1029,7 +1029,7 @@
         <error line="66" column="43" source="standard:if-else-wrapping" />
         <error line="66" column="43" source="standard:multiline-if-else" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/decode/QsoSheet.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/decode/QsoSheet.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="59" column="1" source="standard:no-unused-imports" />
         <error line="60" column="1" source="standard:no-wildcard-imports" />
@@ -1100,14 +1100,14 @@
         <error line="1038" column="17" source="standard:multiline-expression-wrapping" />
         <error line="1042" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/decode/UsStateLookup.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/decode/UsStateLookup.kt">
         <error line="9" column="23" source="standard:function-signature" />
         <error line="9" column="41" source="standard:function-signature" />
         <error line="9" column="54" source="standard:function-signature" />
         <error line="11" column="17" source="standard:multiline-expression-wrapping" />
         <error line="19" column="24" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/logbook/ExportLogSheet.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/logbook/ExportLogSheet.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="66" column="5" source="standard:function-naming" />
         <error line="81" column="13" source="standard:function-naming" />
@@ -1160,7 +1160,7 @@
         <error line="488" column="39" source="standard:function-signature" />
         <error line="488" column="51" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/logbook/LogbookScreen.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/logbook/LogbookScreen.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="87" column="1" source="standard:no-wildcard-imports" />
         <error line="103" column="28" source="standard:multiline-expression-wrapping" />
@@ -1306,7 +1306,7 @@
         <error line="1808" column="25" source="standard:multiline-expression-wrapping" />
         <error line="1872" column="28" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/map/MapScreen.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/map/MapScreen.kt">
         <error line="28" column="1" source="standard:no-unused-imports" />
         <error line="69" column="1" source="standard:no-wildcard-imports" />
         <error line="121" column="30" source="standard:multiline-expression-wrapping" />
@@ -1462,7 +1462,7 @@
         <error line="1559" column="71" source="standard:function-signature" />
         <error line="1559" column="83" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/map/MapViewport.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/map/MapViewport.kt">
         <error line="42" column="30" source="standard:multiline-expression-wrapping" />
         <error line="61" column="23" source="standard:function-signature" />
         <error line="61" column="36" source="standard:function-signature" />
@@ -1472,7 +1472,7 @@
         <error line="74" column="29" source="standard:function-signature" />
         <error line="74" column="38" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/map/MarkerStyle.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/map/MarkerStyle.kt">
         <error line="21" column="18" source="standard:no-multi-spaces" />
         <error line="22" column="20" source="standard:no-multi-spaces" />
         <error line="23" column="19" source="standard:no-multi-spaces" />
@@ -1484,7 +1484,7 @@
         <error line="62" column="17" source="standard:multiline-expression-wrapping" />
         <error line="68" column="16" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/map/PskFilter.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/map/PskFilter.kt">
         <error line="24" column="49" source="standard:function-signature" />
         <error line="28" column="25" source="standard:no-multi-spaces" />
         <error line="35" column="31" source="standard:no-multi-spaces" />
@@ -1498,21 +1498,21 @@
         <error line="64" column="81" source="standard:function-signature" />
         <error line="64" column="93" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/map/WorldOutlines.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/map/WorldOutlines.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="41" column="48" source="standard:no-multi-spaces" />
         <error line="42" column="52" source="standard:no-multi-spaces" />
         <error line="58" column="24" source="standard:multiline-expression-wrapping" />
         <error line="77" column="24" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/motion/Haptics.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/motion/Haptics.kt">
         <error line="1" column="1" source="standard:filename" />
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="40" column="25" source="standard:function-signature" />
         <error line="40" column="41" source="standard:function-signature" />
         <error line="40" column="54" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/motion/MotionTokens.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/motion/MotionTokens.kt">
         <error line="4" column="1" source="standard:no-unused-imports" />
         <error line="8" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="9" column="24" source="standard:multiline-expression-wrapping" />
@@ -1523,7 +1523,7 @@
         <error line="30" column="15" source="standard:property-naming" />
         <error line="31" column="15" source="standard:property-naming" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/pota/ParkPickerSheet.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/pota/ParkPickerSheet.kt">
         <error line="60" column="5" source="standard:function-naming" />
         <error line="76" column="13" source="standard:function-naming" />
         <error line="77" column="5" source="standard:function-signature" />
@@ -1543,7 +1543,7 @@
         <error line="300" column="49" source="standard:function-signature" />
         <error line="300" column="62" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/pota/PotaActivationMap.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/pota/PotaActivationMap.kt">
         <error line="43" column="14" source="standard:function-naming" />
         <error line="61" column="20" source="standard:multiline-expression-wrapping" />
         <error line="92" column="15" source="standard:multiline-expression-wrapping" />
@@ -1569,11 +1569,11 @@
         <error line="180" column="17" source="standard:multiline-expression-wrapping" />
         <error line="184" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/pota/PotaActivationMapData.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/pota/PotaActivationMapData.kt">
         <error line="47" column="20" source="standard:multiline-expression-wrapping" />
         <error line="51" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/pota/PotaAdifExporter.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/pota/PotaAdifExporter.kt">
         <error line="30" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="43" column="29" source="standard:function-signature" />
         <error line="43" column="49" source="standard:function-signature" />
@@ -1607,7 +1607,7 @@
         <error line="192" column="61" source="standard:function-signature" />
         <error line="192" column="75" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/pota/PotaOAuthLogin.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/pota/PotaOAuthLogin.kt">
         <error line="17" column="1" source="standard:no-unused-imports" />
         <error line="88" column="5" source="standard:function-naming" />
         <error line="99" column="24" source="standard:multiline-expression-wrapping" />
@@ -1634,7 +1634,7 @@
         <error line="353" column="36" source="standard:function-signature" />
         <error line="353" column="47" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/pota/PotaScreen.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/pota/PotaScreen.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="97" column="31" source="standard:parameter-list-wrapping" />
         <error line="97" column="59" source="standard:parameter-list-wrapping" />
@@ -1723,7 +1723,7 @@
         <error line="1156" column="33" source="standard:multiline-expression-wrapping" />
         <error line="1156" column="33" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/AboutSettings.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/AboutSettings.kt">
         <error line="32" column="1" source="standard:no-wildcard-imports" />
         <error line="41" column="5" source="standard:function-naming" />
         <error line="61" column="41" source="standard:argument-list-wrapping" />
@@ -1744,7 +1744,7 @@
         <error line="224" column="28" source="standard:multiline-expression-wrapping" />
         <error line="232" column="28" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/AdvancedSettings.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/AdvancedSettings.kt">
         <error line="63" column="33" source="standard:parameter-list-wrapping" />
         <error line="63" column="50" source="standard:parameter-list-wrapping" />
         <error line="63" column="77" source="standard:parameter-list-wrapping" />
@@ -1773,7 +1773,7 @@
         <error line="551" column="13" source="standard:function-naming" />
         <error line="559" column="24" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/BugReportDialog.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/BugReportDialog.kt">
         <error line="54" column="5" source="standard:function-naming" />
         <error line="59" column="23" source="standard:multiline-expression-wrapping" />
         <error line="71" column="24" source="standard:multiline-expression-wrapping" />
@@ -1787,7 +1787,7 @@
         <error line="162" column="26" source="standard:argument-list-wrapping" />
         <error line="162" column="61" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/BugReportLogic.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/BugReportLogic.kt">
         <error line="12" column="1" source="standard:no-consecutive-comments" />
         <error line="31" column="33" source="standard:function-signature" />
         <error line="31" column="54" source="standard:function-signature" />
@@ -1798,7 +1798,7 @@
         <error line="55" column="74" source="standard:function-signature" />
         <error line="57" column="16" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/ConnectionDialogs.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/ConnectionDialogs.kt">
         <error line="61" column="1" source="standard:no-wildcard-imports" />
         <error line="71" column="13" source="standard:function-naming" />
         <error line="80" column="20" source="standard:multiline-expression-wrapping" />
@@ -1843,7 +1843,7 @@
         <error line="647" column="38" source="standard:if-else-wrapping" />
         <error line="647" column="38" source="standard:multiline-if-else" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/DebugLogScreen.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/DebugLogScreen.kt">
         <error line="59" column="5" source="standard:function-naming" />
         <error line="61" column="24" source="standard:multiline-expression-wrapping" />
         <error line="72" column="28" source="standard:multiline-expression-wrapping" />
@@ -1871,7 +1871,7 @@
         <error line="230" column="53" source="standard:argument-list-wrapping" />
         <error line="232" column="16" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/DecodeFilterSettings.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/DecodeFilterSettings.kt">
         <error line="23" column="5" source="standard:function-naming" />
         <error line="53" column="26" source="standard:multiline-expression-wrapping" />
         <error line="152" column="53" source="standard:argument-list-wrapping" />
@@ -1908,7 +1908,7 @@
         <error line="409" column="55" source="standard:argument-list-wrapping" />
         <error line="409" column="82" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/LoggingSettings.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/LoggingSettings.kt">
         <error line="46" column="1" source="standard:no-wildcard-imports" />
         <error line="55" column="5" source="standard:function-naming" />
         <error line="60" column="9" source="standard:property-naming" />
@@ -1963,7 +1963,7 @@
         <error line="721" column="42" source="standard:multiline-expression-wrapping" />
         <error line="738" column="36" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/OperatorCard.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/OperatorCard.kt">
         <error line="28" column="1" source="standard:no-wildcard-imports" />
         <error line="36" column="5" source="standard:function-naming" />
         <error line="46" column="20" source="standard:multiline-expression-wrapping" />
@@ -1974,7 +1974,7 @@
         <error line="73" column="34" source="standard:multiline-expression-wrapping" />
         <error line="140" column="13" source="standard:function-naming" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/RadioAudioSettings.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/RadioAudioSettings.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="50" column="1" source="standard:no-wildcard-imports" />
         <error line="65" column="5" source="standard:function-naming" />
@@ -2054,7 +2054,7 @@
         <error line="1005" column="45" source="standard:function-signature" />
         <error line="1005" column="58" source="standard:function-signature" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/SettingsBackup.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/SettingsBackup.kt">
         <error line="28" column="39" source="standard:multiline-expression-wrapping" />
         <error line="52" column="29" source="standard:function-signature" />
         <error line="87" column="20" source="standard:multiline-expression-wrapping" />
@@ -2064,7 +2064,7 @@
         <error line="135" column="57" source="standard:function-signature" />
         <error line="136" column="27" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/SettingsCommon.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/SettingsCommon.kt">
         <error line="47" column="1" source="standard:no-wildcard-imports" />
         <error line="59" column="14" source="standard:function-naming" />
         <error line="80" column="14" source="standard:function-naming" />
@@ -2087,7 +2087,7 @@
         <error line="377" column="14" source="standard:function-naming" />
         <error line="384" column="24" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/SettingsScreen.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/SettingsScreen.kt">
         <error line="57" column="1" source="standard:no-wildcard-imports" />
         <error line="105" column="5" source="standard:function-naming" />
         <error line="130" column="21" source="standard:multiline-expression-wrapping" />
@@ -2106,7 +2106,7 @@
         <error line="395" column="29" source="standard:multiline-expression-wrapping" />
         <error line="410" column="29" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/TimeCorrection.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/TimeCorrection.kt">
         <error line="20" column="1" source="standard:no-consecutive-comments" />
         <error line="25" column="47" source="standard:function-signature" />
         <error line="29" column="31" source="standard:function-signature" />
@@ -2119,7 +2119,7 @@
         <error line="44" column="80" source="standard:function-signature" />
         <error line="52" column="16" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/TimeSyncSettings.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/TimeSyncSettings.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="40" column="1" source="standard:no-wildcard-imports" />
         <error line="55" column="5" source="standard:function-naming" />
@@ -2140,7 +2140,7 @@
         <error line="350" column="13" source="standard:function-naming" />
         <error line="357" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/settings/TransmissionSettings.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/settings/TransmissionSettings.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="3" column="1" source="standard:no-unused-imports" />
         <error line="26" column="1" source="standard:no-wildcard-imports" />
@@ -2203,7 +2203,7 @@
         <error line="482" column="51" source="standard:argument-list-wrapping" />
         <error line="482" column="78" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/splash/SplashScreen.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/splash/SplashScreen.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="17" column="1" source="standard:no-unused-imports" />
         <error line="19" column="1" source="standard:no-unused-imports" />
@@ -2228,7 +2228,7 @@
         <error line="249" column="52" source="standard:function-signature" />
         <error line="254" column="25" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/radio/ks3ckc/ft8af/ui/waterfall/WaterfallScreen.kt">
+    <file name="src/main/kotlin/radio/ks3ckc/rttyaf/ui/waterfall/WaterfallScreen.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="46" column="1" source="standard:no-wildcard-imports" />
         <error line="74" column="1" source="standard:spacing-between-declarations-with-annotations" />
@@ -2263,58 +2263,58 @@
         <error line="513" column="64" source="standard:function-signature" />
         <error line="513" column="80" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/com/k1af/ft8af/log/ThirdPartyServiceUnsyncedCountTest.kt">
+    <file name="src/test/kotlin/com/k1af/rttyaf/log/ThirdPartyServiceUnsyncedCountTest.kt">
         <error line="20" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="48" column="24" source="standard:function-signature" />
         <error line="48" column="39" source="standard:function-signature" />
         <error line="48" column="47" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/BluetoothAutoConnectTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/BluetoothAutoConnectTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="12" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="16" column="24" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ComposeMainActivityConfigChangesTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ComposeMainActivityConfigChangesTest.kt">
         <error line="27" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="28" column="28" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/HuntColdStartTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/HuntColdStartTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ImmersiveBarsTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ImmersiveBarsTest.kt">
         <error line="24" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="34" column="26" source="standard:multiline-expression-wrapping" />
         <error line="35" column="30" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/LocationPermissionResultTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/LocationPermissionResultTest.kt">
         <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="54" column="21" source="standard:multiline-expression-wrapping" />
         <error line="59" column="22" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/PerBandOutputLevelTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/PerBandOutputLevelTest.kt">
         <error line="13" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/PerBandOutputLevelWiringTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/PerBandOutputLevelWiringTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="22" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="93" column="23" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/QsoPanelLayoutTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/QsoPanelLayoutTest.kt">
         <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/R8KeepRulesTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/R8KeepRulesTest.kt">
         <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="30" column="31" source="standard:function-signature" />
         <error line="30" column="49" source="standard:function-signature" />
         <error line="30" column="63" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/UsbPermissionIntentsTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/UsbPermissionIntentsTest.kt">
         <error line="28" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pota/PotaCqClassifierTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pota/PotaCqClassifierTest.kt">
         <error line="12" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pota/PotaParkPickerLogicTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pota/PotaParkPickerLogicTest.kt">
         <error line="22" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="64" column="25" source="standard:multiline-expression-wrapping" />
         <error line="78" column="25" source="standard:multiline-expression-wrapping" />
@@ -2340,7 +2340,7 @@
         <error line="230" column="21" source="standard:multiline-expression-wrapping" />
         <error line="239" column="21" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pota/PotaSessionManagerTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pota/PotaSessionManagerTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="26" column="17" source="standard:argument-list-wrapping" />
@@ -2353,16 +2353,16 @@
         <error line="27" column="29" source="standard:argument-list-wrapping" />
         <error line="27" column="42" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pota/PotaSpotFrequencyTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pota/PotaSpotFrequencyTest.kt">
         <error line="18" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pota/PotaSpotsRepositoryTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pota/PotaSpotsRepositoryTest.kt">
         <error line="20" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pota/UploadRetryTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pota/UploadRetryTest.kt">
         <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pota/model/PotaModelsTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pota/model/PotaModelsTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="12" column="46" source="standard:multiline-expression-wrapping" />
         <error line="12" column="46" source="standard:function-signature" />
@@ -2372,7 +2372,7 @@
         <error line="24" column="72" source="standard:multiline-expression-wrapping" />
         <error line="24" column="72" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pskreporter/PskReporterClientTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pskreporter/PskReporterClientTest.kt">
         <error line="21" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="23" column="48" source="standard:no-multi-spaces" />
         <error line="40" column="65" source="standard:multiline-expression-wrapping" />
@@ -2402,7 +2402,7 @@
         <error line="210" column="72" source="standard:multiline-expression-wrapping" />
         <error line="210" column="72" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/pskreporter/PskReporterSenderTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/pskreporter/PskReporterSenderTest.kt">
         <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="69" column="20" source="standard:multiline-expression-wrapping" />
         <error line="116" column="20" source="standard:multiline-expression-wrapping" />
@@ -2428,7 +2428,7 @@
         <error line="453" column="98" source="standard:trailing-comma-on-call-site" />
         <error line="464" column="21" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/qrz/QrzXmlClientTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/qrz/QrzXmlClientTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="25" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="48" column="46" source="standard:multiline-expression-wrapping" />
@@ -2456,19 +2456,19 @@
         <error line="182" column="40" source="standard:multiline-expression-wrapping" />
         <error line="182" column="40" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/qrz/QrzXmlParseTagTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/qrz/QrzXmlParseTagTest.kt">
         <error line="15" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="18" column="19" source="standard:multiline-expression-wrapping" />
         <error line="18" column="19" source="standard:string-template-indent" />
         <error line="23" column="9" source="standard:string-template-indent" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/sync/QsoSyncGateTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/sync/QsoSyncGateTest.kt">
         <error line="12" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/theme/ThemePreferenceTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/theme/ThemePreferenceTest.kt">
         <error line="17" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/ActiveQsoPanelLogicTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/ActiveQsoPanelLogicTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="37" column="21" source="standard:function-signature" />
@@ -2490,42 +2490,42 @@
         <error line="135" column="102" source="standard:trailing-comma-on-call-site" />
         <error line="202" column="29" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/BottomSheetOverlayHostTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/BottomSheetOverlayHostTest.kt">
         <error line="32" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/CatStatusChipLogicTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/CatStatusChipLogicTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="20" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/CqOptionsLogicTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/CqOptionsLogicTest.kt">
         <error line="7" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/CqStripSubtitleTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/CqStripSubtitleTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/FT8AFBottomSheetBackTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/RttyafBottomSheetBackTest.kt">
         <error line="28" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="32" column="31" source="standard:multiline-expression-wrapping" />
         <error line="32" column="31" source="standard:function-signature" />
         <error line="38" column="53" source="standard:multiline-expression-wrapping" />
         <error line="38" column="53" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/FilterChipsScreenTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/FilterChipsScreenTest.kt">
         <error line="24" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/InputLevelIndicatorTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/InputLevelIndicatorTest.kt">
         <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/IntSliderSyncTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/IntSliderSyncTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/SheetBackHandlerActiveTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/SheetBackHandlerActiveTest.kt">
         <error line="13" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/SlotTimerStateTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/SlotTimerStateTest.kt">
         <error line="14" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/TxLogDecisionTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/TxLogDecisionTest.kt">
         <error line="15" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="17" column="27" source="standard:function-signature" />
         <error line="17" column="64" source="standard:function-signature" />
@@ -2547,7 +2547,7 @@
         <error line="80" column="58" source="standard:no-multi-spaces" />
         <error line="81" column="14" source="standard:trailing-comma-on-call-site" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/TxStripActionStateTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/TxStripActionStateTest.kt">
         <error line="12" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="60" column="24" source="standard:multiline-expression-wrapping" />
         <error line="61" column="33" source="standard:multiline-expression-wrapping" />
@@ -2575,10 +2575,10 @@
         <error line="68" column="92" source="standard:wrapping" />
         <error line="68" column="93" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/components/TxStripVolumeTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/components/TxStripVolumeTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/decode/DecodeFilterTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/decode/DecodeFilterTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="21" column="5" source="standard:blank-line-before-declaration" />
@@ -2586,39 +2586,39 @@
         <error line="21" column="38" source="standard:function-signature" />
         <error line="21" column="50" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/decode/DecodeRowStyleTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/decode/DecodeRowStyleTest.kt">
         <error line="13" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/decode/DecodeScreenTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/decode/DecodeScreenTest.kt">
         <error line="29" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/decode/QslDisplayFreshnessTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/decode/QslDisplayFreshnessTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="65" column="31" source="standard:function-signature" />
         <error line="65" column="45" source="standard:function-signature" />
         <error line="65" column="63" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/decode/QsoPathProjectionTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/decode/QsoPathProjectionTest.kt">
         <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/decode/QsoSheetLogicTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/decode/QsoSheetLogicTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="62" column="50" source="standard:no-multi-spaces" />
         <error line="63" column="51" source="standard:no-multi-spaces" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/decode/UsStateLookupTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/decode/UsStateLookupTest.kt">
         <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/logbook/LogbookRowLogicTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/logbook/LogbookRowLogicTest.kt">
         <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/logbook/LogbookScreenTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/logbook/LogbookScreenTest.kt">
         <error line="26" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="35" column="5" source="standard:blank-line-before-declaration" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/logbook/LogbookSortTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/logbook/LogbookSortTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="17" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="18" column="24" source="standard:function-signature" />
@@ -2636,12 +2636,12 @@
         <error line="104" column="66" source="standard:no-multi-spaces" />
         <error line="115" column="22" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/map/ConnectionLinesTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/map/ConnectionLinesTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="43" column="21" source="standard:multiline-expression-wrapping" />
         <error line="62" column="21" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/map/GeoOutlinesParseTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/map/GeoOutlinesParseTest.kt">
         <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="24" column="20" source="standard:multiline-expression-wrapping" />
         <error line="24" column="20" source="standard:string-template-indent" />
@@ -2661,14 +2661,14 @@
         <error line="80" column="20" source="standard:string-template-indent" />
         <error line="87" column="9" source="standard:string-template-indent" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/map/MapOverlayToggleTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/map/MapOverlayToggleTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="26" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/map/MapProjectionTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/map/MapProjectionTest.kt">
         <error line="15" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/map/MapViewportTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/map/MapViewportTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="17" column="59" source="standard:no-multi-spaces" />
         <error line="18" column="54" source="standard:no-multi-spaces" />
@@ -2677,16 +2677,16 @@
         <error line="28" column="53" source="standard:no-multi-spaces" />
         <error line="29" column="59" source="standard:no-multi-spaces" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/map/MarkerStyleTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/map/MarkerStyleTest.kt">
         <error line="12" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/map/PskFilterTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/map/PskFilterTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="25" column="54" source="standard:no-multi-spaces" />
         <error line="30" column="66" source="standard:no-multi-spaces" />
         <error line="31" column="66" source="standard:no-multi-spaces" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/pota/BuildActivationAdifTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/pota/BuildActivationAdifTest.kt">
         <error line="25" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="69" column="19" source="standard:wrapping" />
         <error line="69" column="36" source="standard:wrapping" />
@@ -2695,20 +2695,20 @@
         <error line="89" column="47" source="standard:multiline-expression-wrapping" />
         <error line="89" column="47" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/pota/ClassifyUploadFailureTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/pota/ClassifyUploadFailureTest.kt">
         <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/pota/HistoryForDisplayTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/pota/HistoryForDisplayTest.kt">
         <error line="14" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="15" column="28" source="standard:function-signature" />
         <error line="15" column="38" source="standard:function-signature" />
         <error line="15" column="57" source="standard:function-signature" />
         <error line="15" column="73" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/pota/OAuthRedirectTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/pota/OAuthRedirectTest.kt">
         <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/pota/PotaActivationMapDataTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/pota/PotaActivationMapDataTest.kt">
         <error line="15" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="18" column="21" source="standard:function-signature" />
         <error line="18" column="39" source="standard:function-signature" />
@@ -2726,7 +2726,7 @@
         <error line="75" column="20" source="standard:multiline-expression-wrapping" />
         <error line="85" column="20" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/pota/PotaActivationProjectionTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/pota/PotaActivationProjectionTest.kt">
         <error line="18" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="40" column="24" source="standard:multiline-expression-wrapping" />
         <error line="41" column="30" source="standard:no-multi-spaces" />
@@ -2735,18 +2735,18 @@
         <error line="47" column="18" source="standard:multiline-expression-wrapping" />
         <error line="51" column="18" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/pota/PotaAdifExporterTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/pota/PotaAdifExporterTest.kt">
         <error line="13" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/pota/StripWebViewTokenTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/pota/StripWebViewTokenTest.kt">
         <error line="12" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/settings/BugReportLogicTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/settings/BugReportLogicTest.kt">
         <error line="12" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="13" column="51" source="standard:multiline-expression-wrapping" />
         <error line="13" column="51" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/settings/LanguagePickerTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/settings/LanguagePickerTest.kt">
         <error line="3" column="1" source="standard:import-ordering" />
         <error line="18" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="71" column="26" source="standard:multiline-expression-wrapping" />
@@ -2754,10 +2754,10 @@
         <error line="97" column="50" source="standard:multiline-expression-wrapping" />
         <error line="97" column="50" source="standard:function-signature" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/settings/RigDisplayNameTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/settings/RigDisplayNameTest.kt">
         <error line="15" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/settings/SettingsBackupTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/settings/SettingsBackupTest.kt">
         <error line="15" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="16" column="32" source="standard:multiline-expression-wrapping" />
         <error line="46" column="20" source="standard:multiline-expression-wrapping" />
@@ -2780,19 +2780,19 @@
         <error line="88" column="52" source="standard:argument-list-wrapping" />
         <error line="88" column="72" source="standard:argument-list-wrapping" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/settings/SettingsScreenTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/settings/SettingsScreenTest.kt">
         <error line="28" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/settings/TimeCorrectionTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/settings/TimeCorrectionTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/settings/VolumeClampTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/settings/VolumeClampTest.kt">
         <error line="17" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/waterfall/WaterfallScreenLayoutTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/waterfall/WaterfallScreenLayoutTest.kt">
         <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/test/kotlin/radio/ks3ckc/ft8af/ui/waterfall/WaterfallScreenTest.kt">
+    <file name="src/test/kotlin/radio/ks3ckc/rttyaf/ui/waterfall/WaterfallScreenTest.kt">
         <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
 </baseline>

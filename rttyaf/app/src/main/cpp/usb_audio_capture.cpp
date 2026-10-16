@@ -29,7 +29,7 @@
 #include "fir_decimator.h"
 #include "rational_resampler.h"
 
-#define TAG "ft8af_usb_capture"
+#define TAG "rttyaf_usb_capture"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN,  TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
@@ -302,7 +302,7 @@ void eventLoop(CaptureSession* s) {
 // ----------------------------------------------------------------------------
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_k1af_ft8af_wave_UsbAudioNative_nativeStart(
+Java_com_k1af_rttyaf_wave_UsbAudioNative_nativeStart(
         JNIEnv* env,
         jclass /*clazz*/,
         jint fd,
@@ -450,7 +450,7 @@ Java_com_k1af_ft8af_wave_UsbAudioNative_nativeStart(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_k1af_ft8af_wave_UsbAudioNative_nativeStop(
+Java_com_k1af_rttyaf_wave_UsbAudioNative_nativeStop(
         JNIEnv* env, jclass /*clazz*/, jlong handlePtr) {
     if (handlePtr == 0) return;
     auto* s = reinterpret_cast<CaptureSession*>(handlePtr);
@@ -615,7 +615,7 @@ void LIBUSB_CALL onOutputComplete(libusb_transfer* xfer) {
 }  // namespace
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_k1af_ft8af_wave_UsbAudioNative_nativeWrite(
+Java_com_k1af_rttyaf_wave_UsbAudioNative_nativeWrite(
         JNIEnv* env,
         jclass /*clazz*/,
         jint fd,
@@ -798,7 +798,7 @@ Java_com_k1af_ft8af_wave_UsbAudioNative_nativeWrite(
 // thread (and a no-op if no write is running). Sets the cancel flag, then nudges
 // the event loop so the drain loop notices now rather than after its 50ms tick.
 extern "C" JNIEXPORT void JNICALL
-Java_com_k1af_ft8af_wave_UsbAudioNative_nativeCancelWrite(
+Java_com_k1af_rttyaf_wave_UsbAudioNative_nativeCancelWrite(
         JNIEnv* /*env*/, jclass /*clazz*/) {
     g_outputCancel.store(true, std::memory_order_release);
     libusb_context* ctx = g_outputCtx.load(std::memory_order_acquire);
@@ -811,7 +811,7 @@ Java_com_k1af_ft8af_wave_UsbAudioNative_nativeCancelWrite(
 // [0, 1]. Safe to call from any thread at any time (a relaxed store); if no
 // write is in flight it just sets the value the next write starts from.
 extern "C" JNIEXPORT void JNICALL
-Java_com_k1af_ft8af_wave_UsbAudioNative_nativeSetTxVolume(
+Java_com_k1af_rttyaf_wave_UsbAudioNative_nativeSetTxVolume(
         JNIEnv* /*env*/, jclass /*clazz*/, jfloat volume) {
     float v = volume;
     if (v < 0.0f) v = 0.0f;

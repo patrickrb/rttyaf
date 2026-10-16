@@ -3,7 +3,7 @@
 # Release is built with minifyEnabled true (shrink + obfuscate). The default
 # proguard-android-optimize.txt already covers the common cases we rely on:
 #   * classes that declare `native` methods keep their name + the native method
-#     names (so the libft8af.so JNI symbol names Java_com_k1af_ft8af_* still
+#     names (so the librttyaf.so JNI symbol names Java_com_k1af_rttyaf_* still
 #     resolve) — covers FT8SignalListener, GenerateFT8, FT8Package, FT8Resample,
 #     SpectrumView, SpectrumFragment, UsbAudioNative, ReBuildSignal.
 #   * enum values()/valueOf() and Parcelable CREATOR fields.
@@ -21,14 +21,14 @@
 # by field by field. The field names are baked into the C++; obfuscating them
 # makes every decode silently write nothing. Keep all fields (methods may still
 # be obfuscated).
--keepclassmembers class com.k1af.ft8af.Ft8Message {
+-keepclassmembers class com.k1af.rttyaf.Ft8Message {
     <fields>;
 }
 
 # --- JNI: callback methods invoked by name via GetMethodID(...) ---
 # usb_audio_capture.cpp calls back into the AudioInputCallback by method name +
 # signature. Keep the interface methods so implementers keep the same names.
--keepclassmembers interface com.k1af.ft8af.wave.UsbAudioNative$AudioInputCallback {
+-keepclassmembers interface com.k1af.rttyaf.wave.UsbAudioNative$AudioInputCallback {
     void onAudioData(float[], int);
     void onCaptureStopped(int);
 }
@@ -38,7 +38,7 @@
 # .newInstance(...), and ProbeTable invokes the static getSupportedDevices()
 # via getMethod("getSupportedDevices"). Both are reached only reflectively, so
 # R8 would otherwise drop them as unused.
--keepclassmembers class * implements com.k1af.ft8af.serialport.UsbSerialDriver {
+-keepclassmembers class * implements com.k1af.rttyaf.serialport.UsbSerialDriver {
     public <init>(android.hardware.usb.UsbDevice);
     public static java.util.Map getSupportedDevices();
 }

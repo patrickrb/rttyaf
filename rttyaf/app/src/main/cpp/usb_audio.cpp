@@ -9,11 +9,11 @@
 #include <cstdio>
 #include <string>
 
-#define TAG "ft8af_usb_native"
+#define TAG "rttyaf_usb_native"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_com_k1af_ft8af_wave_UsbAudioNative_nativeBuildString(
+Java_com_k1af_rttyaf_wave_UsbAudioNative_nativeBuildString(
         JNIEnv *env, jclass /* clazz */) {
     // Calls into libusb to confirm static linkage worked. If libusb's
     // symbols are stripped, this won't compile; if it loads but libusb
@@ -21,7 +21,7 @@ Java_com_k1af_ft8af_wave_UsbAudioNative_nativeBuildString(
     const libusb_version *v = libusb_get_version();
     char buf[160];
     std::snprintf(buf, sizeof(buf),
-                  "ft8af_usb (libusb %d.%d.%d.%d%s)",
+                  "rttyaf_usb (libusb %d.%d.%d.%d%s)",
                   v->major, v->minor, v->micro, v->nano,
                   v->rc ? v->rc : "");
     LOGI("nativeBuildString -> %s", buf);

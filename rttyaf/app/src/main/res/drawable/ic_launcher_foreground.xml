@@ -33,7 +33,7 @@
         android:strokeWidth="3.2"
         android:strokeLineCap="round" />
 
-    <!-- Center disc (AF-family motif, like FT8AF's operator QTH) with a
+    <!-- Center disc (AF-family motif, like RTTYAF's operator QTH) with a
          mark-to-space gradient: violet top fading to fuchsia-pink bottom. -->
     <path android:pathData="M54,57 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0">
         <aapt:attr name="android:fillColor">

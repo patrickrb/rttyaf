@@ -23,7 +23,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <com.k1af.ft8af.ui.VolumeProgress
+    <com.k1af.rttyaf.ui.VolumeProgress
         android:id="@+id/volumeProgress"
         android:layout_width="0dp"
         android:layout_height="18dp"

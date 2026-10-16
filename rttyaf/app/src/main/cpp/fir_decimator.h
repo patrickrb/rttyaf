@@ -8,10 +8,10 @@
 // anti-aliasing with a proper windowed-sinc low-pass before decimating.
 //
 // Header-only and free of JNI/libusb/Android deps on purpose, so the DSP can be unit-tested
-// on the host (see ft8af_glue/test_fir_decimator.cpp + run_host_tests).
+// on the host (see rttyaf_glue/test_fir_decimator.cpp + run_host_tests).
 
-#ifndef FT8AF_FIR_DECIMATOR_H
-#define FT8AF_FIR_DECIMATOR_H
+#ifndef RTTYAF_FIR_DECIMATOR_H
+#define RTTYAF_FIR_DECIMATOR_H
 
 #include <algorithm>
 #include <cmath>
@@ -130,4 +130,4 @@ private:
     int phase_ = 0;
 };
 
-#endif  // FT8AF_FIR_DECIMATOR_H
+#endif  // RTTYAF_FIR_DECIMATOR_H

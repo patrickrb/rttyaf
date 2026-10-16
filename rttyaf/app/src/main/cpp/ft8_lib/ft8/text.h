@@ -37,7 +37,7 @@ bool equals(const char* string1, const char* string2);
 //   - merges consecutive spaces into single space
 // Named ft8_fmtmsg (not the upstream `fmtmsg`) to avoid colliding with the
 // POSIX `fmtmsg(long, ...)` declared in <fmtmsg.h>, which is visible when this
-// header is compiled under the macOS/Apple SDK (e.g. FT8AFKit `swift test`).
+// header is compiled under the macOS/Apple SDK (e.g. RttyafKit `swift test`).
 void ft8_fmtmsg(char* msg_out, const char* msg_in);
 
 /// Extract and copy a space-delimited token from a string.
