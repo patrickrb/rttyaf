@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import com.k1af.ft8af.ui.ToastMessage
 import radio.ks3ckc.ft8af.theme.Accent
 import radio.ks3ckc.ft8af.theme.BgApp
 import radio.ks3ckc.ft8af.theme.BgSurface
@@ -273,8 +274,14 @@ fun OperateScreen(state: RttyAppState) {
                     .background(if (txOn) StatusBad else Accent)
                     .clickable {
                         // TX sends the staged buffer (key → modulate → unkey);
-                        // STOP aborts an over in progress.
-                        if (txOn) engine.stopTx() else engine.transmit(state.txPreview)
+                        // STOP aborts an over in progress. An empty buffer gets a
+                        // hint instead of a silent no-op; the backend toasts its
+                        // own refusals (FT8 sequencer active, unsupported route).
+                        when (txTapAction(txOn, state.txPreview)) {
+                            TxTapAction.STOP -> engine.stopTx()
+                            TxTapAction.SEND -> engine.transmit(state.txPreview)
+                            TxTapAction.EMPTY -> ToastMessage.show("Nothing to send — tap a macro first")
+                        }
                     },
                 contentAlignment = Alignment.Center,
             ) {
@@ -593,6 +600,20 @@ private fun MacroButton(m: RttyMacro, modifier: Modifier, onClick: () -> Unit) {
         Text(m.name, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Text(m.key, color = TextFaint, fontSize = 9.sp, fontFamily = GeistMonoFamily)
     }
+}
+
+/** What a tap on the TX/STOP button does. */
+internal enum class TxTapAction { STOP, SEND, EMPTY }
+
+/**
+ * STOP while an over is on the air; otherwise SEND the staged buffer, or EMPTY
+ * when there is nothing staged (the operator needs a hint, not silence). Pure —
+ * unit-tested.
+ */
+internal fun txTapAction(txOn: Boolean, buffer: String): TxTapAction = when {
+    txOn -> TxTapAction.STOP
+    buffer.isBlank() -> TxTapAction.EMPTY
+    else -> TxTapAction.SEND
 }
 
 private fun logQso(state: RttyAppState) {

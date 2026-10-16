@@ -29,4 +29,18 @@ class OperateScreenLogicTest {
     fun xyGeometry_neverCollapsesToZeroRadius() {
         assertThat(XyScopeGeometry(width = 2f, height = 2f).r).isEqualTo(1f)
     }
+
+    @Test
+    fun txTap_stopsWhileOnAir_whateverIsStaged() {
+        assertThat(txTapAction(txOn = true, buffer = "CQ CQ DE KS3CKC")).isEqualTo(TxTapAction.STOP)
+        assertThat(txTapAction(txOn = true, buffer = "")).isEqualTo(TxTapAction.STOP)
+    }
+
+    @Test
+    fun txTap_sendsAStagedBuffer_andHintsOnAnEmptyOne() {
+        assertThat(txTapAction(txOn = false, buffer = "CQ CQ DE KS3CKC")).isEqualTo(TxTapAction.SEND)
+        // Whitespace only is "nothing staged": the engine would drop it silently.
+        assertThat(txTapAction(txOn = false, buffer = "   ")).isEqualTo(TxTapAction.EMPTY)
+        assertThat(txTapAction(txOn = false, buffer = "")).isEqualTo(TxTapAction.EMPTY)
+    }
 }
