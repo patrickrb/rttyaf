@@ -149,56 +149,6 @@ public class FT8TransmitSignal {
     public final MutableLiveData<Boolean> mutableIsTuning = new MutableLiveData<>();
     public final MutableLiveData<Integer> mutableTuneRemainingSec = new MutableLiveData<>();
 
-    // RTTY continuous-carrier TX (feat/rtty-tx). The RTTY app streams a finite
-    // Baudot-FSK waveform (whole message), so it borrows the tune worker's
-    // discipline — own-keying via the message-free onTuneKeyDown/Up pair and
-    // audio teardown in a finally — rather than the FT8 slot machinery.
-    // Two audio routes, chosen exactly as playFT8Signal chooses them: Android's
-    // AudioTrack sink, or the USB-direct (libusb) route when the operator picked
-    // a USB sound card for output (UsbAudioDevice.writeAudio — the path FT8 TX
-    // proves out every cycle). Refusing USB-direct here was why a station with
-    // a CM108-style codec got no RTTY TX at all.
-    private volatile boolean rttyTransmitting = false;
-    private volatile boolean rttyTxCancelled = false;
-    private volatile boolean rttyUsbRoute = false;
-    private AudioTrack rttyAudioTrack = null;
-
-    /** An opened USB-direct output stream, as the RTTY worker sees it. Package-visible for tests. */
-    interface RttyUsbOutput {
-        /** Stream the full-scale waveform; false on failure or STOP. */
-        boolean write(float[] pcm, int sampleRate);
-
-        void close();
-    }
-
-    /** Opens the operator's USB-direct output, or null when it can't. Package-visible for tests. */
-    interface RttyUsbOutputOpener {
-        RttyUsbOutput open();
-    }
-
-    /**
-     * The real USB-direct output behind {@link #playRttyViaUsb}: the shared
-     * {@link #openUsbAudioOutput} plus {@link UsbAudioDevice#writeAudio}. Tests
-     * swap in a fake to exercise the worker's keying/close discipline without
-     * hardware.
-     */
-    RttyUsbOutputOpener rttyUsbOpener = () -> {
-        UsbAudioDevice dev = openUsbAudioOutput("RTTY TX");
-        if (dev == null) return null;
-        return new RttyUsbOutput() {
-            @Override
-            public boolean write(float[] pcm, int sampleRate) {
-                return dev.writeAudio(pcm, sampleRate);
-            }
-
-            @Override
-            public void close() {
-                dev.close();
-            }
-        };
-    };
-    public final MutableLiveData<Boolean> mutableIsRttyTransmitting = new MutableLiveData<>();
-
     private final OnDoTransmitted onDoTransmitted;// typically used for opening/closing PTT
     private final ExecutorService doTransmitThreadPool = Executors.newCachedThreadPool();
     private final DoTransmitRunnable doTransmitRunnable = new DoTransmitRunnable(this);
@@ -723,7 +673,7 @@ public class FT8TransmitSignal {
                 GeneralVariables.usbAudioOutputProductId,
                 GeneralVariables.volumePercent * 100f,
                 GeneralVariables.autoVolumeEnabled));
-        if (isUsbDirectOutput(GeneralVariables.audioOutputDeviceId,
+        if (UsbAudioDevice.isUsbDirectOutput(GeneralVariables.audioOutputDeviceId,
                 GeneralVariables.usbAudioOutputVendorId)) {
             GeneralVariables.fileLog("playFT8Signal: using USB audio (direct) output");
             playViaUsbAudio(buffer);
@@ -857,7 +807,7 @@ public class FT8TransmitSignal {
                 GeneralVariables.usbAudioOutputProductId,
                 buffer.length, GeneralVariables.audioSampleRate));
 
-        UsbAudioDevice usbDev = openUsbAudioOutput("playViaUsbAudio");
+        UsbAudioDevice usbDev = UsbAudioDevice.openConfiguredOutput("playViaUsbAudio");
         if (usbDev == null) {
             afterPlayAudio();
             return;
@@ -890,66 +840,6 @@ public class FT8TransmitSignal {
 
         usbDev.close();
         afterPlayAudio();
-    }
-
-    /**
-     * Open the operator's USB-direct output device (by the saved VID:PID) and
-     * activate its output stream at 48 kHz. Shared by FT8 TX and RTTY TX. Every
-     * abort is logged with {@code who} as the prefix so debug.log says which TX
-     * path hit it; returns null on any failure (the caller unkeys and/or tells
-     * the operator). The caller owns {@link UsbAudioDevice#close()}.
-     */
-    private UsbAudioDevice openUsbAudioOutput(String who) {
-        Context context = GeneralVariables.getMainContext();
-        if (context == null) {
-            GeneralVariables.fileLog(who + ": ABORT no main context");
-            return null;
-        }
-
-        UsbDevice device = UsbAudioDevice.findDeviceByVidPid(context,
-                GeneralVariables.usbAudioOutputVendorId,
-                GeneralVariables.usbAudioOutputProductId);
-        if (device == null) {
-            GeneralVariables.fileLog(String.format(
-                    "%s: ABORT USB audio output device not found by VID:PID %04X:%04X",
-                    who,
-                    GeneralVariables.usbAudioOutputVendorId,
-                    GeneralVariables.usbAudioOutputProductId));
-            return null;
-        }
-
-        UsbManager usbManager = (UsbManager) context.getSystemService(Context.USB_SERVICE);
-        if (usbManager == null) {
-            GeneralVariables.fileLog(who + ": ABORT UsbManager is null");
-            return null;
-        }
-        if (!usbManager.hasPermission(device)) {
-            GeneralVariables.fileLog(who + ": ABORT no USB permission for output device "
-                    + "(re-pick (USB direct) in Settings to re-grant)");
-            return null;
-        }
-
-        UsbAudioDevice usbDev = new UsbAudioDevice();
-        if (!usbDev.open(context, device)) {
-            GeneralVariables.fileLog(who + ": ABORT UsbAudioDevice.open() failed "
-                    + "(descriptor parse or claimInterface failed)");
-            return null;
-        }
-
-        if (!usbDev.hasOutput()) {
-            GeneralVariables.fileLog(who + ": ABORT device has no output endpoint");
-            usbDev.close();
-            return null;
-        }
-
-        if (!usbDev.activateOutput(48000)) {
-            GeneralVariables.fileLog(who + ": ABORT activateOutput(48000) failed "
-                    + "(alt-setting select or rate setup failed)");
-            usbDev.close();
-            return null;
-        }
-        GeneralVariables.fileLog(who + ": device opened, output activated at 48000 Hz");
-        return usbDev;
     }
 
     /**
@@ -2488,7 +2378,7 @@ public class FT8TransmitSignal {
                         GeneralVariables.band + Math.round(GeneralVariables.getBaseFrequency())),
                 onDoTransmitted != null && onDoTransmitted.supportTransmitOverCAT(),
                 GeneralVariables.connectMode == ConnectMode.NETWORK,
-                isUsbDirectOutput(GeneralVariables.audioOutputDeviceId,
+                UsbAudioDevice.isUsbDirectOutput(GeneralVariables.audioOutputDeviceId,
                         GeneralVariables.usbAudioOutputVendorId));
         switch (block) {
             case TX_ACTIVE:
@@ -2658,270 +2548,6 @@ public class FT8TransmitSignal {
             }
         }
         return null;
-    }
-
-    /** Why {@link #transmitRtty} refused to key ({@code NONE} = go). Pure — unit-tested. */
-    enum RttyTxBlockReason {
-        NONE,
-        /** The FT8 sequencer is armed or on the air; the rig is its. */
-        FT8_ACTIVE,
-        /** An RTTY over is already going out (single-flight). */
-        RTTY_ACTIVE,
-        /** Network (Icom LAN) or (tr)uSDX CAT audio: RTTY has no sender for those. */
-        UNSUPPORTED_ROUTE,
-    }
-
-    /**
-     * Pure gate for an RTTY over, ordered by severity like {@link #tuneBlockReason}.
-     * Note what is <em>not</em> here: the USB-direct sound card. That route is
-     * served ({@link #playRttyViaUsb}), not refused.
-     */
-    static RttyTxBlockReason rttyTxBlockReason(boolean ft8ActiveOrArmed,
-                                               boolean rttyActive,
-                                               boolean networkRoute,
-                                               boolean catAudioRoute) {
-        if (ft8ActiveOrArmed) return RttyTxBlockReason.FT8_ACTIVE;
-        if (rttyActive) return RttyTxBlockReason.RTTY_ACTIVE;
-        if (networkRoute || catAudioRoute) return RttyTxBlockReason.UNSUPPORTED_ROUTE;
-        return RttyTxBlockReason.NONE;
-    }
-
-    /**
-     * Whether TX audio goes out the USB-direct (libusb) route: the operator
-     * picked a USB sound card ("USB direct" = output device id -1) and its VID
-     * is saved. The one expression every TX path (FT8, tune, RTTY) agrees on.
-     * Pure — unit-tested.
-     */
-    static boolean isUsbDirectOutput(int audioOutputDeviceId, int usbAudioOutputVendorId) {
-        return audioOutputDeviceId == -1 && usbAudioOutputVendorId != 0;
-    }
-
-    /** Whether an RTTY over is currently on the air. */
-    public boolean isRttyTransmitting() {
-        return rttyTransmitting;
-    }
-
-    /**
-     * Transmit a pre-modulated RTTY (Baudot-FSK) waveform: key the rig, stream
-     * the whole {@code pcm} buffer out the sound card at TX volume, then unkey.
-     * Non-blocking — playback runs on a dedicated worker that owns keying and
-     * audio teardown in a finally (a stuck carrier is never acceptable). The
-     * audio route (AudioTrack vs. USB-direct) is the same one FT8 TX would take.
-     *
-     * @param pcm        mono float samples in -1..1 at {@code sampleRate}
-     * @param sampleRate the rate {@code pcm} was generated at (drives AudioTrack)
-     * @return true if TX started; false if blocked (busy, or an unsupported
-     *         audio route) — an operator toast explains a block
-     */
-    public boolean transmitRtty(float[] pcm, int sampleRate) {
-        if (pcm == null || pcm.length == 0 || sampleRate <= 0) return false;
-        RttyTxBlockReason block = rttyTxBlockReason(
-                isTransmitting || activated,
-                rttyTransmitting,
-                GeneralVariables.connectMode == ConnectMode.NETWORK,
-                GeneralVariables.controlMode == ControlMode.CAT
-                        && onDoTransmitted != null
-                        && onDoTransmitted.supportTransmitOverCAT());
-        if (block != RttyTxBlockReason.NONE) {
-            // Logged so a "TX did nothing" report reads straight off debug.log.
-            GeneralVariables.fileLog("RTTY TX: refused reason=" + block);
-            switch (block) {
-                case FT8_ACTIVE:
-                    ToastMessage.show(GeneralVariables.getStringFromResource(R.string.tune_blocked_tx));
-                    break;
-                case UNSUPPORTED_ROUTE:
-                    ToastMessage.show(GeneralVariables.getStringFromResource(
-                            R.string.rtty_tx_unavailable_route));
-                    break;
-                default:
-                    break; // RTTY_ACTIVE: the UI already shows STOP for the over in progress
-            }
-            return false;
-        }
-        boolean usbDirect = isUsbDirectOutput(
-                GeneralVariables.audioOutputDeviceId, GeneralVariables.usbAudioOutputVendorId);
-        rttyTxCancelled = false;
-        rttyUsbRoute = usbDirect;
-        rttyTransmitting = true;
-        mutableIsRttyTransmitting.postValue(true);
-        new Thread(() -> playRttyWaveform(pcm, sampleRate, usbDirect), "RttyTx").start();
-        return true;
-    }
-
-    /** Operator stop: cancel the in-progress RTTY over; the worker unkeys. */
-    public void stopRttyTx() {
-        rttyTxCancelled = true;
-        // USB-direct route: the worker is blocked inside UsbAudioDevice.writeAudio;
-        // flip its (native + fallback) cancel flag so the write returns within
-        // tens of ms and the worker's finally drops PTT.
-        if (rttyUsbRoute) UsbAudioNative.cancelWrite();
-        // Don't release here — the worker may be blocked in WRITE_BLOCKING;
-        // pause()+flush() drains it so the write returns and the worker's finally
-        // does the stop()/release() + PTT drop (same discipline as setTransmitting).
-        AudioTrack t = rttyAudioTrack;
-        if (t != null) {
-            try {
-                if (t.getState() != AudioTrack.STATE_UNINITIALIZED
-                        && t.getPlayState() != AudioTrack.PLAYSTATE_STOPPED) {
-                    t.pause();
-                    t.flush();
-                }
-            } catch (IllegalStateException ignored) {
-                // Worker already released the track between our read and here.
-            }
-        }
-    }
-
-    /**
-     * RTTY TX audio worker. Owns keying and the AudioTrack for its whole life;
-     * every exit path (finish, stop, write error, exception) releases PTT and the
-     * track via the finally block. Streams {@code pcm} in ~50ms chunks, re-reading
-     * volumePercent per chunk so a level change lands mid-over (as the FT8/tune
-     * paths do), and bails promptly when {@link #stopRttyTx()} flips the cancel.
-     */
-    private void playRttyWaveform(float[] pcm, int sampleRate, boolean usbDirect) {
-        long startedAt = System.currentTimeMillis();
-        AudioTrack track = null;
-        boolean keyed = false;
-        try {
-            GeneralVariables.fileLog(String.format(
-                    "RTTY TX: start route=%s samples=%d rate=%d level=%.0f%% "
-                            + "audioOutputDeviceId=%d usbVidPid=%04X:%04X",
-                    usbDirect ? "usb-direct" : "audiotrack",
-                    pcm.length, sampleRate, GeneralVariables.volumePercent * 100f,
-                    GeneralVariables.audioOutputDeviceId,
-                    GeneralVariables.usbAudioOutputVendorId,
-                    GeneralVariables.usbAudioOutputProductId));
-            onDoTransmitted.onTuneKeyDown();
-            keyed = true;
-            try {
-                Thread.sleep(GeneralVariables.pttDelay); // let the rig key before audio
-            } catch (InterruptedException ignored) {
-            }
-
-            if (usbDirect) {
-                // The finally below still unkeys and clears the TX flags.
-                if (!rttyTxCancelled) playRttyViaUsb(pcm, sampleRate);
-                return;
-            }
-
-            AudioAttributes attrs = new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build();
-            int encoding = GeneralVariables.audioOutput32Bit
-                    ? AudioFormat.ENCODING_PCM_FLOAT : AudioFormat.ENCODING_PCM_16BIT;
-            AudioFormat fmt = new AudioFormat.Builder().setSampleRate(sampleRate)
-                    .setEncoding(encoding)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build();
-            int bytesPerSample = GeneralVariables.audioOutput32Bit ? 4 : 2;
-            int targetBufBytes = (sampleRate / 5) * bytesPerSample; // ~200ms mono
-            int minBuf = AudioTrack.getMinBufferSize(sampleRate,
-                    AudioFormat.CHANNEL_OUT_MONO, encoding);
-            int bufBytes = Math.max(targetBufBytes, minBuf > 0 ? minBuf : targetBufBytes);
-            track = new AudioTrack(attrs, fmt, bufBytes, AudioTrack.MODE_STREAM, 0);
-            rttyAudioTrack = track;
-            if (GeneralVariables.audioOutputDeviceId > 0) {
-                track.setPreferredDevice(findAudioDeviceById(
-                        GeneralVariables.audioOutputDeviceId, AudioManager.GET_DEVICES_OUTPUTS));
-            }
-            track.play();
-            track.setVolume(1.0f); // TX level is baked into the samples (applyVolume)
-
-            final int chunkSamples = Math.max(1, sampleRate / 20); // ~50ms
-            int framesWritten = 0;
-            int offset = 0;
-            boolean writeError = false;
-            while (offset < pcm.length) {
-                if (rttyTxCancelled) break;
-                int chunkLen = Math.min(chunkSamples, pcm.length - offset);
-                float[] chunk = applyVolume(pcm, offset, chunkLen, GeneralVariables.volumePercent);
-                int writeResult;
-                if (GeneralVariables.audioOutput32Bit) {
-                    writeResult = track.write(chunk, 0, chunkLen, AudioTrack.WRITE_BLOCKING);
-                } else {
-                    writeResult = track.write(floatToInt16NoPad(chunk, chunkLen), 0, chunkLen,
-                            AudioTrack.WRITE_BLOCKING);
-                }
-                if (writeResult < 0) {
-                    Log.e(TAG, "RTTY playback error: " + writeResult);
-                    writeError = true;
-                    break;
-                }
-                framesWritten += writeResult;
-                offset += chunkLen;
-            }
-            // Blocking writes return once buffered, not played; wait for the tail
-            // to drain so the message end isn't truncated. STOP skips the wait.
-            if (!writeError && !rttyTxCancelled) {
-                while (!rttyTxCancelled) {
-                    if (track.getPlaybackHeadPosition() >= framesWritten) break;
-                    try {
-                        Thread.sleep(20);
-                    } catch (InterruptedException e) {
-                        break;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "RTTY TX worker failed: " + e);
-        } finally {
-            AudioTrack t = track;
-            rttyAudioTrack = null;
-            if (t != null) {
-                try {
-                    t.stop();
-                } catch (IllegalStateException ignored) {
-                }
-                t.release();
-            }
-            if (keyed) {
-                try {
-                    onDoTransmitted.onTuneKeyUp();
-                } catch (Exception e) {
-                    Log.e(TAG, "RTTY key-up failed: " + e);
-                }
-            }
-            boolean wasCancelled = rttyTxCancelled;
-            rttyUsbRoute = false;
-            rttyTransmitting = false;
-            mutableIsRttyTransmitting.postValue(false);
-            GeneralVariables.fileLog(String.format(
-                    "RTTY TX: stop cancelled=%b durationMs=%d",
-                    wasCancelled, System.currentTimeMillis() - startedAt));
-        }
-    }
-
-    /**
-     * RTTY over out the USB-direct sound card: the same open → writeAudio →
-     * close sequence as {@link #playViaUsbAudio}, minus FT8's late-start slice.
-     * {@code writeAudio} takes the full-scale waveform and applies the TX level
-     * live (native drain loop / per-chunk fallback), so STOP and the level
-     * slider both act within tens of ms. Keying belongs to the caller; a failure
-     * here is told to the operator because the rig has already keyed on dead air.
-     */
-    private void playRttyViaUsb(float[] pcm, int sampleRate) {
-        RttyUsbOutput out = rttyUsbOpener.open();
-        if (out == null) {
-            ToastMessage.show(GeneralVariables.getStringFromResource(R.string.tx_audio_dropped));
-            return;
-        }
-        try {
-            // STOP while the device was opening (tens of ms) must not play the
-            // whole over: writeAudio resets the *shared* cancel flags on entry,
-            // so only this over's own flag survives the open. Check it last.
-            if (rttyTxCancelled) {
-                GeneralVariables.fileLog("RTTY TX: STOP during device open, nothing written");
-                return;
-            }
-            boolean ok = out.write(pcm, sampleRate);
-            GeneralVariables.fileLog("RTTY TX: writeAudio returned " + (ok ? "OK" : "FAILED"));
-            if (shouldWarnTxDropped(ok, rttyTxCancelled || UsbAudioNative.writeCancelled)) {
-                ToastMessage.show(GeneralVariables.getStringFromResource(R.string.tx_audio_dropped));
-            }
-        } finally {
-            out.close();
-        }
     }
 
     private static class DoTransmitRunnable implements Runnable {
