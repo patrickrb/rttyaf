@@ -723,13 +723,15 @@ public class MainViewModel extends ViewModel {
         });
 
 
-        ft8SignalListener.startListen();
-
-        //start PSKReporter spot upload sender
-        PskReporterSender.INSTANCE.start();
-
-        //spectrum listener object
-        spectrumListener = new SpectrumListener(hamRecorder);
+        // RTTYAF never runs the FT8 engine (see Ft8EnginePolicy): no 15 s slot
+        // decoder, no PSK Reporter FT8 uploads, no FT8 waterfall FFT. The RTTY
+        // modem taps hamRecorder directly (RttyEngine). spectrumListener stays
+        // null: its only consumers are the FT8 waterfall views RTTYAF never shows.
+        if (Ft8EnginePolicy.runsFt8Engine()) {
+            ft8SignalListener.startListen();
+            PskReporterSender.INSTANCE.start();
+            spectrumListener = new SpectrumListener(hamRecorder);
+        }
 
 
         //create transmit object; callbacks: before transmit, after transmit, after QSL success.
