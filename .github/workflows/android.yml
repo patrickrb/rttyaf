@@ -386,7 +386,7 @@ jobs:
             # disambiguates it from production candidates.
             new_tag="android-dev.${GITHUB_RUN_NUMBER}"
             # Derive the base semver from the latest android-v* (or legacy v*)
-            # tag so the APK reads e.g. "1.1.0-dev.42" instead of a bare run
+            # tag so the APK reads e.g. "1.2.0-dev.42" instead of a bare run
             # number. Until the first android-v* tag exists, fall back to the
             # static versionName in rttyaf/app/build.gradle (keep in sync).
             latest=$(git tag --list 'android-v*' --sort=-v:refname | head -n1)
@@ -395,7 +395,7 @@ jobs:
               legacy=$(git tag --list 'v*' --sort=-v:refname | head -n1)
               base_ver="${legacy#v}"
             fi
-            base_ver="${base_ver:-1.1.0}"
+            base_ver="${base_ver:-1.2.0}"
             echo "release_tag=$new_tag" >> "$GITHUB_OUTPUT"
             echo "version_name=${base_ver}-dev.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
             echo "should_release=true" >> "$GITHUB_OUTPUT"
@@ -589,6 +589,9 @@ jobs:
           track: ${{ steps.tag.outputs.play_track }}
           status: completed
           releaseName: ${{ steps.tag.outputs.release_tag }}
+          # Play "What's new" text for testers (one file per locale, 500 chars max;
+          # ReleaseMetadataTest enforces the limit).
+          whatsNewDirectory: distribution/whatsnew
 
       # Make a swallowed publish failure visible (annotation on the run) without
       # failing the job — the artifact + GitHub Release already succeeded.

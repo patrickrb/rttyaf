@@ -1,0 +1,7 @@
+RTTYAF 1.2.0
+• TX now works with USB sound cards set to "USB direct" (CM108-style codecs)
+• A status banner explains when TX or a band change is refused
+• New RTTY Mode settings: baud, shift, 2125/2295 tones, LSB/USB, USOS; AFC now off by default
+• XY tuning scope, real NET, and tap MARK/SPACE to snap back to your tones
+• RTTYAF name everywhere, in every language
+• Removed the hidden FT8 engine: no background FT8 decoding or uploads, smaller app
