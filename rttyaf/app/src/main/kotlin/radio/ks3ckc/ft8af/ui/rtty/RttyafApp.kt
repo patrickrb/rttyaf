@@ -1,6 +1,7 @@
 package radio.ks3ckc.ft8af.ui.rtty
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,16 +12,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.k1af.ft8af.GeneralVariables
 import com.k1af.ft8af.MainViewModel
 import radio.ks3ckc.ft8af.rtty.InMemoryRttyPrefsStore
 import radio.ks3ckc.ft8af.rtty.RttyEngine
@@ -29,7 +37,10 @@ import radio.ks3ckc.ft8af.rtty.RttyPrefsStore
 import radio.ks3ckc.ft8af.rtty.spots.SpotService
 import radio.ks3ckc.ft8af.rtty.spots.formatDialLabel
 import radio.ks3ckc.ft8af.rtty.spots.RttySegments
+import radio.ks3ckc.ft8af.theme.Accent
 import radio.ks3ckc.ft8af.theme.BgApp
+import radio.ks3ckc.ft8af.theme.BgSurface2
+import radio.ks3ckc.ft8af.theme.TextPrimary
 
 /** A logged RTTY contact, kept in memory for the Log screen (DB logging is phase 2). */
 data class RttyLogEntry(
@@ -177,6 +188,36 @@ enum class RttyTab { OPERATE, CONTEST, MACROS, LOG, SETTINGS }
  * the RTTYAF.dc.html design, reusing the FT8AF dark theme. Replaces FT8AFApp as
  * the app shell (see ComposeMainActivity.setContent).
  */
+/**
+ * The backend's operator messages. FT8AF's `ToastMessage.show` is not an Android
+ * toast: it posts to `GeneralVariables.mutableDebugMessage`, which the old
+ * Activity rendered as a banner. Nothing in the Compose shell observed it, so
+ * every refusal — "RTTY TX needs a sound-card audio route", TX audio dropped,
+ * band change refused while keyed — was invisible, and a TX tap that did
+ * nothing looked like a dead button. Shown above the nav bar for the ~5 s
+ * ToastMessage keeps each message alive.
+ */
+@Composable
+private fun StatusBanner() {
+    val raw by GeneralVariables.mutableDebugMessage.observeAsState()
+    val text = statusBannerText(raw) ?: return
+    Box(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(12.dp)).background(BgSurface2)
+            .border(1.dp, Accent, RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Text(text, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/**
+ * Banner text for a raw `mutableDebugMessage` payload: null or blank hides the
+ * banner (ToastMessage posts the empty join once its last message expires).
+ * Pure — unit-tested.
+ */
+internal fun statusBannerText(raw: String?): String? = raw?.trim()?.takeIf { it.isNotEmpty() }
+
 @Composable
 fun RttyafApp(
     engine: RttyEngine,
@@ -200,6 +241,7 @@ fun RttyafApp(
                     RttyTab.SETTINGS -> RttySettingsScreen(state)
                 }
             }
+            StatusBanner()
             RttyNavBar(
                 active = tab,
                 onSelect = { tab = it },
