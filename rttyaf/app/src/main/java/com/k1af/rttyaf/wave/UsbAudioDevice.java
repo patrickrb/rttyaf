@@ -1,6 +1,8 @@
 package com.k1af.rttyaf.wave;
 
 import android.content.Context;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.hardware.usb.UsbConstants;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
@@ -14,7 +16,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * USB Audio Class 1.0 device handler for direct USB audio communication.
@@ -71,6 +75,12 @@ public class UsbAudioDevice {
     // see detachKernelAudioDriver().
     private UsbInterface controlInterface;
     private boolean controlInterfaceClaimed;
+
+    // Which open UsbAudioDevice holds the AudioControl claim, per USB device node. The RX
+    // session and each TX open are separate connections to the same card; only one of them
+    // may hold the claim, or each force-claim steals it from the other.
+    private static final ControlClaimRegistry<UsbAudioDevice> CONTROL_CLAIMS =
+            new ControlClaimRegistry<>();
 
     // Singleton active device for use by MicRecorder / FT8TransmitSignal
     private static UsbAudioDevice activeInputDevice;
@@ -169,8 +179,122 @@ public class UsbAudioDevice {
             connection = null;
             return false;
         }
-        detachKernelAudioDriver();
+        // The kernel driver is detached later, by detachKernelAudioDriverIfRoutesAllow(),
+        // once the caller has activated a stream. Detaching here would take the card away
+        // from Android even when activation then fails and the caller falls back to it.
         return true;
+    }
+
+    /**
+     * Detaches the kernel audio driver (see {@link #detachKernelAudioDriver()}) unless the
+     * other audio direction may be using this card through Android. Call it only after the
+     * stream for this direction is activated, so a failed USB-direct open never strands an
+     * Android fallback without the card.
+     *
+     * @param forInput true when this device was opened for RX, false for TX
+     */
+    public void detachKernelAudioDriverIfRoutesAllow(boolean forInput) {
+        boolean allowed;
+        if (forInput) {
+            int outId = com.k1af.rttyaf.GeneralVariables.audioOutputDeviceId;
+            allowed = otherDirectionAllowsDetach(outId,
+                    com.k1af.rttyaf.GeneralVariables.usbAudioOutputVendorId,
+                    false,
+                    isUsbAndroidAudioDevice(outId, AudioManager.GET_DEVICES_OUTPUTS));
+        } else {
+            int inId = com.k1af.rttyaf.GeneralVariables.audioInputDeviceId;
+            UsbAudioDevice rx = activeInputDevice;
+            allowed = otherDirectionAllowsDetach(inId,
+                    com.k1af.rttyaf.GeneralVariables.usbAudioInputVendorId,
+                    rx == null || !rx.isOpen(),
+                    isUsbAndroidAudioDevice(inId, AudioManager.GET_DEVICES_INPUTS));
+        }
+        if (!allowed) {
+            com.k1af.rttyaf.GeneralVariables.fileLog(
+                    "UsbAudioDevice: kernel audio driver left attached: the "
+                            + (forInput ? "output" : "input")
+                            + " route may use this card through Android");
+            return;
+        }
+        detachKernelAudioDriver();
+    }
+
+    /**
+     * Whether detaching the kernel driver for one direction is safe given how the
+     * <em>other</em> direction is configured. Detaching retires the card from Android until
+     * it is replugged, so it is only allowed when the other direction can't be using the
+     * card through Android:
+     * <ul>
+     *   <li>USB direct ({@code -1}) with a saved VID: allowed, unless that direction fell
+     *       back to Android audio because its own USB-direct open failed;</li>
+     *   <li>system default ({@code 0}): refused, since Android routes to an attached USB
+     *       card by default;</li>
+     *   <li>an explicit Android device ({@code > 0}): allowed only when it is not a USB
+     *       device (a device that can't be found counts as USB, see
+     *       {@link #isUsbAndroidAudioDevice}).</li>
+     * </ul>
+     * Package-visible for tests.
+     */
+    static boolean otherDirectionAllowsDetach(int otherDeviceId, int otherUsbVendorId,
+                                              boolean otherUsbDirectFellBack,
+                                              boolean otherAndroidDeviceIsUsb) {
+        if (otherDeviceId == -1) return otherUsbVendorId != 0 && !otherUsbDirectFellBack;
+        if (otherDeviceId == 0) return false;
+        return !otherAndroidDeviceIsUsb;
+    }
+
+    /**
+     * Whether Android audio device {@code deviceId} is a USB device, or can't be found (a
+     * missing device makes Android fall back to its default route, which may be the USB
+     * card, so it counts as USB). Ids {@code <= 0} aren't explicit Android devices.
+     */
+    private static boolean isUsbAndroidAudioDevice(int deviceId, int flags) {
+        if (deviceId <= 0) return false;
+        Context context = com.k1af.rttyaf.GeneralVariables.getMainContext();
+        AudioManager am = context == null ? null
+                : (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return true;
+        for (AudioDeviceInfo info : am.getDevices(flags)) {
+            if (info.getId() == deviceId) {
+                int type = info.getType();
+                return type == AudioDeviceInfo.TYPE_USB_DEVICE
+                        || type == AudioDeviceInfo.TYPE_USB_HEADSET
+                        || type == AudioDeviceInfo.TYPE_USB_ACCESSORY;
+            }
+        }
+        return true;
+    }
+
+    private boolean isOpen() { return connection != null; }
+
+    /**
+     * Tracks which owner holds the AudioControl claim for each device key, so that of
+     * several open connections to the same card exactly one force-claims it. Thread-safe;
+     * package-visible for tests.
+     */
+    static final class ControlClaimRegistry<T> {
+        private final Map<String, T> holders = new HashMap<>();
+
+        /**
+         * Runs {@code claim} for {@code owner} unless another owner already holds
+         * {@code key}, and records the owner when the claim succeeds. Returns null when
+         * skipped because another owner holds it, else the claim's result.
+         */
+        synchronized Boolean claimUnlessHeld(String key, T owner,
+                                             java.util.function.BooleanSupplier claim) {
+            T holder = holders.get(key);
+            if (holder != null && holder != owner) return null;
+            boolean ok = claim.getAsBoolean();
+            if (ok) holders.put(key, owner);
+            return ok;
+        }
+
+        /** Drops {@code owner}'s hold on {@code key}; a no-op if someone else holds it. */
+        synchronized void release(String key, T owner) {
+            if (holders.get(key) == owner) holders.remove(key);
+        }
+
+        synchronized T holder(String key) { return holders.get(key); }
     }
 
     /**
@@ -202,16 +326,12 @@ public class UsbAudioDevice {
      */
     private void detachKernelAudioDriver() {
         if (connection == null || usbDevice == null) return;
-        // The per-cycle TX open runs while the session-long RX capture already holds the
-        // AudioControl interface on the same device: the driver is already gone, and a
-        // second force-claim would only steal the claim from the RX connection each cycle.
-        UsbAudioDevice holder = activeInputDevice;
-        boolean holderAlreadyDetached = holder != null && holder != this
-                && holder.controlInterfaceClaimed && usbDevice.equals(holder.usbDevice);
-
+        // When the RX session and a TX open both have the card open, the first to claim
+        // holds it: the driver is already gone, and a second force-claim would only steal
+        // the claim from the other connection. The registry makes check-and-claim atomic.
         final UsbDevice dev = usbDevice;
         final UsbDeviceConnection conn = connection;
-        KernelDetachResult result = detachKernelAudioDriver(new KernelDetachPort() {
+        final KernelDetachPort port = new KernelDetachPort() {
             @Override public int interfaceCount() { return dev.getInterfaceCount(); }
             @Override public int interfaceClass(int i) {
                 return dev.getInterface(i).getInterfaceClass();
@@ -228,13 +348,21 @@ public class UsbAudioDevice {
                     return false;
                 }
             }
-        }, holderAlreadyDetached);
+        };
+        final KernelDetachResult[] attempt = new KernelDetachResult[1];
+        Boolean claimed = CONTROL_CLAIMS.claimUnlessHeld(dev.getDeviceName(), this, () -> {
+            attempt[0] = detachKernelAudioDriver(port, false);
+            return attempt[0] == KernelDetachResult.CLAIMED;
+        });
+        KernelDetachResult result =
+                claimed == null ? KernelDetachResult.SKIPPED_HOLDER : attempt[0];
 
         controlInterfaceClaimed = result == KernelDetachResult.CLAIMED;
         switch (result) {
             case SKIPPED_HOLDER:
                 com.k1af.rttyaf.GeneralVariables.fileLog(
-                        "UsbAudioDevice: kernel audio driver already detached by the RX session");
+                        "UsbAudioDevice: kernel audio driver already detached by another open "
+                                + "connection to this device");
                 break;
             case NO_CONTROL_INTERFACE:
                 com.k1af.rttyaf.GeneralVariables.fileLog(
@@ -1125,6 +1253,9 @@ public class UsbAudioDevice {
                     connection.releaseInterface(controlInterface);
                 }
             } catch (Exception ignored) {}
+            if (controlInterfaceClaimed && usbDevice != null) {
+                CONTROL_CLAIMS.release(usbDevice.getDeviceName(), this);
+            }
             controlInterfaceClaimed = false;
             connection.close();
             connection = null;
@@ -1337,6 +1468,7 @@ public class UsbAudioDevice {
             usbDev.close();
             return null;
         }
+        usbDev.detachKernelAudioDriverIfRoutesAllow(/*forInput=*/ false);
         com.k1af.rttyaf.GeneralVariables.fileLog(who + ": device opened, output activated at 48000 Hz");
         return usbDev;
     }

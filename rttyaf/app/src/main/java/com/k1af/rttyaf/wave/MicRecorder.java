@@ -202,6 +202,7 @@ public class MicRecorder {
             return null;
         }
 
+        usbDev.detachKernelAudioDriverIfRoutesAllow(/*forInput=*/ true);
         GeneralVariables.fileLog("openUsbAudioInput: SUCCESS at "
                 + usbDev.getInputSampleRate() + " Hz");
         return usbDev;
