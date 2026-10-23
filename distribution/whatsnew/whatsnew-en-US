@@ -1,7 +1,3 @@
-RTTYAF 1.2.0
-• TX now works with USB sound cards set to "USB direct" (CM108-style codecs)
-• A status banner explains when TX or a band change is refused
-• New RTTY Mode settings: baud, shift, 2125/2295 tones, LSB/USB, USOS; AFC now off by default
-• XY tuning scope, real NET, and tap MARK/SPACE to snap back to your tones
-• RTTYAF name everywhere, in every language
-• Removed the hidden FT8 engine: no background FT8 decoding or uploads, smaller app
+RTTYAF 1.2.1
+• USB sound cards set to "USB direct" for both RX and TX no longer drop out when the phone plays a sound (notifications, Bluetooth, navigation prompts)
+• Setups that mix USB direct with Android audio on the same card keep working as before
