@@ -4,6 +4,25 @@ Internal-track builds are named `<version>-dev.<CI run>`; the short tester-facin
 text for each release lives in `distribution/whatsnew/` (shown in Play's
 "What's new").
 
+## 1.2.1 — 2026-10-23
+
+### Fixed
+- **USB-direct audio dropped out when the phone played a sound.** RTTYAF talked
+  to the USB sound card directly but left Android's own audio driver attached,
+  so a notification, a Bluetooth connect or a nav prompt routed to the card
+  could tear down RX capture or a TX over. The app now detaches that driver
+  once a USB-direct stream is running. It does this only when no Android audio
+  route can need the card: setups that use USB direct for one direction and
+  Android audio (including system default) for the other keep the old
+  behavior. (#20)
+
+### Notes for testers
+- Set both input and output to the USB sound card's "USB direct" entry to get
+  the fix. `debug.log` shows `kernel audio driver detach via AudioControl
+  iface N: OK` when it applies.
+- While the app holds the card, Android can't play through it; it comes back
+  after an unplug and replug.
+
 ## 1.2.0 — 2026-10-16
 
 ### Fixed

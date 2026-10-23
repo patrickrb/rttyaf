@@ -56,12 +56,12 @@ android {
         // published versionCode once more.
         def ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")
         versionCode ciRunNumber ? (ciRunNumber.toInteger() + 1000) : 11
-        // CI passes -PVERSION_NAME_OVERRIDE derived from the git tag (v1.2.0 ->
-        // "1.2.0", dev-42 -> "1.2.0-dev.42"). Local builds use the fallback.
+        // CI passes -PVERSION_NAME_OVERRIDE derived from the git tag (v1.2.1 ->
+        // "1.2.1", dev-42 -> "1.2.1-dev.42"). Local builds use the fallback.
         // Keep in sync with base_ver in .github/workflows/android.yml (a unit
         // test, ReleaseMetadataTest, enforces it).
         def ciVersionName = project.findProperty('VERSION_NAME_OVERRIDE')
-        versionName ciVersionName ?: '1.2.0'
+        versionName ciVersionName ?: '1.2.1'
 
 
         externalNativeBuild {

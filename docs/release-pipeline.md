@@ -38,7 +38,7 @@ Per-platform prefixes keep the Releases page unambiguous:
 | iOS      | _(no release yet)_    | _(no release yet)_        | —                         |
 
 - Android internal builds derive their versionName from the latest
-  `android-v*` tag (e.g. `1.2.0-dev.42`); until the first such tag exists the
+  `android-v*` tag (e.g. `1.2.1-dev.42`); until the first such tag exists the
   workflow falls back to the static versionName in `rttyaf/app/build.gradle`.
 - The desktop workflow still carries FT8AF's staging lane; since no `staging`
   branch exists it never fires — `main` pushes and `desktop-v*` tags are the
