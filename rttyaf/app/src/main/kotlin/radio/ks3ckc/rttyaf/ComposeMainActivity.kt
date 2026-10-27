@@ -285,6 +285,12 @@ class ComposeMainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         // Proceed regardless; same behavior as original.
 
+        // RECORD_AUDIO just granted (first launch): the mic capture opened at startup failed
+        // without it, so rebuild it now instead of leaving RX deaf until the next app launch.
+        if (micGrantedIn(permissions, grantResults)) {
+            mainViewModel.restartAudioAfterMicGrant()
+        }
+
         // GPS grid auto-update: the toggle in Settings (and the cold-start path)
         // requests ACCESS_FINE_LOCATION *asynchronously* and then immediately calls
         // GridLocationUpdater.refresh(). On the very first enable the permission is
@@ -710,6 +716,15 @@ class ComposeMainActivity : AppCompatActivity() {
 }
 
 /**
+ * True if this permission result granted RECORD_AUDIO. Top-level + [internal] so
+ * the first-launch mic restart can be unit-tested without constructing the Activity.
+ */
+internal fun micGrantedIn(
+    permissions: Array<out String>,
+    grantResults: IntArray,
+): Boolean = permissionGrantedIn(permissions, grantResults, Manifest.permission.RECORD_AUDIO)
+
+/**
  * True if this permission result granted either fine or coarse location.
  * Top-level + [internal] so the GPS-grid restart decision (issue #59) can be
  * unit-tested without constructing the Activity.
@@ -717,16 +732,21 @@ class ComposeMainActivity : AppCompatActivity() {
 internal fun locationGrantedIn(
     permissions: Array<out String>,
     grantResults: IntArray,
-): Boolean {
-    for (i in permissions.indices) {
-        if (i >= grantResults.size) break
-        val p = permissions[i]
-        if ((p == Manifest.permission.ACCESS_FINE_LOCATION ||
-                p == Manifest.permission.ACCESS_COARSE_LOCATION) &&
-            grantResults[i] == PackageManager.PERMISSION_GRANTED
-        ) {
-            return true
-        }
-    }
-    return false
+): Boolean = permissionGrantedIn(
+    permissions,
+    grantResults,
+    Manifest.permission.ACCESS_FINE_LOCATION,
+    Manifest.permission.ACCESS_COARSE_LOCATION,
+)
+
+/**
+ * True if this permission result granted any of [wanted]. A cancelled request
+ * delivers an empty (or short) [grantResults], which counts as not granted.
+ */
+internal fun permissionGrantedIn(
+    permissions: Array<out String>,
+    grantResults: IntArray,
+    vararg wanted: String,
+): Boolean = permissions.indices.any { i ->
+    permissions[i] in wanted && grantResults.getOrNull(i) == PackageManager.PERMISSION_GRANTED
 }
