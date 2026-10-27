@@ -285,6 +285,12 @@ class ComposeMainActivity : AppCompatActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         // Proceed regardless; same behavior as original.
 
+        // RECORD_AUDIO just granted (first launch): the mic capture opened at startup failed
+        // without it, so rebuild it now instead of leaving RX deaf until the next app launch.
+        if (micGrantedIn(permissions, grantResults)) {
+            mainViewModel.restartAudioAfterMicGrant()
+        }
+
         // GPS grid auto-update: the toggle in Settings (and the cold-start path)
         // requests ACCESS_FINE_LOCATION *asynchronously* and then immediately calls
         // GridLocationUpdater.refresh(). On the very first enable the permission is
@@ -707,6 +713,18 @@ class ComposeMainActivity : AppCompatActivity() {
         mainViewModel.utcTimer?.delete()
         System.exit(0)
     }
+}
+
+/**
+ * True if this permission result granted RECORD_AUDIO. Top-level + [internal] so
+ * the first-launch mic restart can be unit-tested without constructing the Activity.
+ */
+internal fun micGrantedIn(
+    permissions: Array<out String>,
+    grantResults: IntArray,
+): Boolean {
+    val i = permissions.indexOf(Manifest.permission.RECORD_AUDIO)
+    return i >= 0 && grantResults.getOrNull(i) == PackageManager.PERMISSION_GRANTED
 }
 
 /**

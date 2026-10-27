@@ -1056,6 +1056,17 @@ public class MainViewModel extends ViewModel {
     }
 
     /**
+     * RECORD_AUDIO was just granted: bring up the mic capture that could not
+     * open at startup without it (see {@link HamRecorder#restartMicAfterPermissionGrant}).
+     */
+    public void restartAudioAfterMicGrant() {
+        if (hamRecorder != null) {
+            GeneralVariables.fileLog("RECORD_AUDIO granted: restarting mic capture");
+            hamRecorder.restartMicAfterPermissionGrant();
+        }
+    }
+
+    /**
      * Check whether the rig is connected. Two cases: rigBaseClass not created, or serial port connection failed.
      *
      * @return whether connected
