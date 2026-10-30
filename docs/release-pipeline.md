@@ -1,5 +1,13 @@
 # Release pipeline
 
+> **Shared-core rollout: internal testing only.** Do not merge to `main` as an
+> internal-only delivery shortcut: the existing desktop workflow unconditionally
+> creates a non-prerelease `desktop-v*` release on main pushes, even when no
+> desktop files changed. Keep this rollout on a build-only feature PR and use a
+> test APK. No production release, promotion or rollout until the user tests
+> **all five apps** (FT8AF, RTTYAF, SSTVAF, ROTA, JTTYAF) and explicitly approves.
+> Do not modify release automation to bypass this boundary.
+
 Three platforms (Android, desktop, iOS) build and release **independently** —
 each has its own workflow, its own path filter, its own tag namespace, and its
 own required status-check gate. A change to one platform never rebuilds the
@@ -37,6 +45,8 @@ Per-platform prefixes keep the Releases page unambiguous:
 | Desktop  | `desktop-v<x.y.z>`    | `desktop-dev.<run#>`      | _(dormant — was `staging`)_ |
 | iOS      | _(no release yet)_    | _(no release yet)_        | —                         |
 
+- Desktop **production** releases also auto-bump `desktop-v*` on every push to
+  `main`; the dormant staging prerelease lane does not make main internal-only.
 - Android internal builds derive their versionName from the latest
   `android-v*` tag (e.g. `1.2.1-dev.42`); until the first such tag exists the
   workflow falls back to the static versionName in `rttyaf/app/build.gradle`.

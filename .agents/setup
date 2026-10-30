@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run from any directory. Toolchains live outside the checkout so worktrees share them.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export ANDROID_HOME="$HOME/.local/share/android-sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+echo '==> Checking Linux build prerequisites'
+packages=(openjdk-17-jdk-headless curl unzip)
+missing=()
+for package in "${packages[@]}"; do
+    dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -qx 'install ok installed' || missing+=("$package")
+done
+if ((${#missing[@]})); then
+    sudo apt-get update -qq
+    sudo apt-get install -y --no-install-recommends "${missing[@]}"
+fi
+
+echo '==> Installing Android command-line tools (11076708)'
+if [[ ! -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]]; then
+    scratch="$(mktemp -d)"
+    trap 'rm -rf "$scratch"' EXIT
+    curl --fail --location --retry 3 --output "$scratch/tools.zip" \
+        https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+    unzip -q "$scratch/tools.zip" -d "$scratch"
+    mkdir -p "$ANDROID_HOME/cmdline-tools"
+    mv "$scratch/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+fi
+
+echo '==> Accepting SDK licenses and installing Android build packages'
+# yes exits with SIGPIPE after sdkmanager closes stdin; retain sdkmanager's status.
+set +o pipefail
+yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses >/dev/null
+license_status=${PIPESTATUS[1]}
+set -o pipefail
+((license_status == 0)) || exit "$license_status"
+sdkmanager --sdk_root="$ANDROID_HOME" --install \
+    'platform-tools' 'platforms;android-36' 'build-tools;34.0.0' \
+    'ndk;27.0.12077973' 'cmake;3.22.1'
+
+echo '==> Persisting toolchain environment for new login shells'
+mkdir -p "$HOME/.config/rttyaf"
+cat > "$HOME/.config/rttyaf/env.sh" <<'EOF'
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export ANDROID_HOME="$HOME/.local/share/android-sdk"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+EOF
+profile_line='source "$HOME/.config/rttyaf/env.sh" # RTTYAF orb toolchain'
+if ! grep -Fqx "$profile_line" "$HOME/.bash_profile" 2>/dev/null; then
+    printf '\n%s\n' "$profile_line" >> "$HOME/.bash_profile"
+fi
+
+echo '==> Resolving Gradle plugins and confirming the Android project'
+"$repo_root/rttyaf/gradlew" -p "$repo_root/rttyaf" --no-daemon --max-workers=1 \
+    -Pkotlin.compiler.execution.strategy=in-process \
+    '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' help
+echo '==> Setup complete; see AGENTS.md and docs/development.md for checks'
