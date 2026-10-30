@@ -1,10 +1,10 @@
-package com.k1af.rttyaf.wave;
+package radio.core.audio;
 
 /**
  * Streaming polyphase rational (L/M) resampler — Java port of
  * {@code cpp/rational_resampler.h} (same Blackman windowed-sinc kernel, cutoff, per-branch
  * normalization, and streaming behavior), for the {@code UsbRequest} fallback capture path in
- * {@link UsbAudioDevice}.
+ * the Android USB adapter.
  *
  * <p>Why it exists (issue #364): both USB capture paths used to floor the decimation ratio, so
  * a device that only streams 44.1 kHz got {@code 44100/12000 -> 3} and actually produced
@@ -16,7 +16,7 @@ package com.k1af.rttyaf.wave;
  *
  * <p>Streaming-safe: call {@link #process} repeatedly across buffers; filter state carries
  * over. This is also the host-testable reference implementation of the native kernel — keep
- * the two in sync (the C++ side is covered by {@code rttyaf_glue/test_rational_resampler.cpp}).
+ * the two in sync (the C++ side is covered by {@code ft8af_glue/test_rational_resampler.cpp}).
  */
 public final class RationalResampler {
 

@@ -14,8 +14,8 @@ name: Android CI & Release
 # testers; production is a deliberate act: push an android-v* tag.
 #
 # PATH-FILTERED: on pull requests this whole pipeline only runs when
-# Android-relevant files change (rttyaf/** — which includes the native FT8/RTTY
-# DSP core at rttyaf/app/src/main/cpp/ — or this workflow file). Pushes to main
+# Android-relevant files change (rttyaf/**, ham-radio-core/**, or this
+# workflow file). Pushes to main
 # and android-v* tags always build (a full release snapshot, regardless of what
 # changed). The always-run `android-gate` job is the single required status
 # check so branch protection never gets stuck "pending" when the build jobs are
@@ -67,6 +67,7 @@ jobs:
           filters: |
             android:
               - 'rttyaf/**'
+              - 'ham-radio-core/**'
               - '.github/workflows/android.yml'
 
       - name: Decide whether to run
@@ -138,7 +139,7 @@ jobs:
 
       - name: Run unit tests
         working-directory: rttyaf
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: ./gradlew :ham-radio-core:test testDebugUnitTest --stacktrace
 
       - name: Generate coverage report
         working-directory: rttyaf
@@ -156,11 +157,13 @@ jobs:
           flags: android
 
       - name: Upload test reports on failure
-        if: steps.codecov.outcome == 'failure'
+        if: failure() || steps.codecov.outcome == 'failure'
         uses: actions/upload-artifact@v7
         with:
           name: unit-test-reports
           path: |
+            ham-radio-core/build/reports/tests/
+            ham-radio-core/build/test-results/
             rttyaf/app/build/reports/tests/
             rttyaf/app/build/test-results/
             rttyaf/app/build/reports/jacoco/

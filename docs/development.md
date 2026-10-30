@@ -32,19 +32,20 @@ bash -lc 'java -version; command -v sdkmanager; command -v adb'
 Run host verification from the repository root:
 
 ```sh
-bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=2 testDebugUnitTest assembleDebug'
+bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs="-Xmx1536m -Dfile.encoding=UTF-8" :ham-radio-core:test testDebugUnitTest assembleDebug'
 ```
 
-These worker limits are appropriate for an 8 GB orb. Do not use `clean` on every
-iteration: it discards useful incremental work. In a shell that already has the
-toolchain environment, the equivalent commands (and focused checks) are:
+Use a 1536 MiB Gradle heap, one worker and in-process Kotlin in bounded orbs.
+Always run `:ham-radio-core:test` explicitly: `testDebugUnitTest` alone does not
+execute the portable Java library tests. Its unchanged source/test payload and
+update rules are documented in [shared-radio-core.md](shared-radio-core.md).
+Do not use `clean` on every iteration: it discards useful incremental work.
+In a shell that already has the toolchain environment, focused checks are:
 
 ```sh
 cd rttyaf
-./gradlew --no-daemon --max-workers=2 testDebugUnitTest
-./gradlew --no-daemon --max-workers=2 testDebugUnitTest --tests 'radio.ks3ckc.rttyaf.rtty.RttyModemTest'
-./gradlew --no-daemon --max-workers=2 assembleDebug
-./gradlew --no-daemon --max-workers=2 jacocoTestReport
+./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' testDebugUnitTest --tests 'radio.ks3ckc.rttyaf.rtty.RttyModemTest'
+./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' jacocoTestReport
 ```
 
 The modem suite exercises real text → AFSK → text round trips, baud rates,
@@ -58,6 +59,7 @@ Outputs (relative to `rttyaf/`):
 - Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 - Unit report: `app/build/reports/tests/testDebugUnitTest/index.html`
 - JUnit XML: `app/build/test-results/testDebugUnitTest/TEST-*.xml`
+- Core report/XML: `../ham-radio-core/build/{reports/tests/test/index.html,test-results/test/TEST-*.xml}`
 - Coverage: `app/build/reports/jacoco/jacocoTestReport/{html/index.html,jacocoTestReport.xml}`
 
 Optional static checks are `./gradlew lintDebug detekt ktlintCheck`. Existing
@@ -68,6 +70,27 @@ test names and distinguish baseline failures from regressions.
 `.github/workflows/agent-readiness.yml` exercises this same setup twice, checks
 a clean login environment, and runs host tests plus the debug build whenever
 the onboarding files change. Existing Android CI covers Android source changes.
+Both workflows detect core changes and run/upload both modules' tests.
+Readiness also uploads `rttyaf-internal-debug-apk` for authenticated CI download,
+including on core-only PRs. App JaCoCo/Codecov reporting does not include the
+vendored core's coverage; this is an observability limitation, not a skipped
+core test suite.
+
+## Internal testing boundary for this rollout
+
+Do not merge this integration to `main`: although Android's main lane publishes
+to Play internal, the desktop workflow also creates a **production** desktop
+release on every main push. Keep the feature PR build-only and distribute the
+debug APK for internal testing. Do not alter release automation to bypass this.
+No production release, tag or promotion is authorized until the user tests all
+five apps (FT8AF, RTTYAF, SSTVAF, ROTA, JTTYAF) and explicitly approves.
+
+Debug APKs use a development signing key, not the Play/release key, and cannot
+replace a differently signed installed app. Back up/export logs and settings
+before uninstalling anything; uninstalling deletes app data. A Play-track build
+requires access to the configured signing key and Play service account; never
+paste these secrets into a thread. See [release-pipeline.md](release-pipeline.md)
+for the existing procedures, but audit every platform workflow before delivery.
 
 ## Existing macOS / Windows checkouts
 

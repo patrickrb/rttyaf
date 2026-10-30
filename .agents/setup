@@ -55,5 +55,7 @@ if ! grep -Fqx "$profile_line" "$HOME/.bash_profile" 2>/dev/null; then
 fi
 
 echo '==> Resolving Gradle plugins and confirming the Android project'
-"$repo_root/rttyaf/gradlew" -p "$repo_root/rttyaf" --no-daemon --max-workers=2 help
+"$repo_root/rttyaf/gradlew" -p "$repo_root/rttyaf" --no-daemon --max-workers=1 \
+    -Pkotlin.compiler.execution.strategy=in-process \
+    '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' help
 echo '==> Setup complete; see AGENTS.md and docs/development.md for checks'

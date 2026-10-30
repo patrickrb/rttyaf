@@ -15,6 +15,8 @@ This is the shared guidance for humans and coding agents. `CLAUDE.md` points her
 - `rttyaf/app/src/main/cpp/`: vendored libusb and JNI USB audio bridge, built
   from source into `librttyaf.so`. No FT8 DSP library or prebuilt JNI copy step.
 - `rttyaf/app/src/test/{java,kotlin}/`: host JVM/JUnit4 and Robolectric tests.
+- `ham-radio-core/`: unchanged portable Java library and its 44 tests;
+  see [docs/shared-radio-core.md](docs/shared-radio-core.md) for update rules.
 - `rttyaf/app/src/androidTest/`: instrumented tests requiring Android hardware
   or an emulator outside an orb.
 - `desktop/`, `ios/`: legacy FT8 ports, not the Android RTTY app. Their native
@@ -35,9 +37,10 @@ After setup, **new login shells** get `JAVA_HOME`, `ANDROID_HOME`,
 `ANDROID_SDK_ROOT` and SDK tools on `PATH`. To validate from a current shell:
 
 ```sh
-bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=2 testDebugUnitTest assembleDebug'
+bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs="-Xmx1536m -Dfile.encoding=UTF-8" :ham-radio-core:test testDebugUnitTest assembleDebug'
 ```
 
+Always include `:ham-radio-core:test`: the Android test task does not run it.
 Orbs cannot run accelerated Android emulators; do not install an AVD. Host tests
 are not proof that the UI renders or that USB/audio works on a real radio.
 Use a connected Android runner/device for UI, permission and hardware checks.
@@ -66,6 +69,10 @@ No web server or `.agents/resume` is needed for the host build/test workflow.
   signing material, local SDK paths or build outputs.
 - Pushes, PR creation, merges and releases require the user's authorization.
   Merging to `main` triggers publishing; do not trigger it merely to verify setup.
+  Android publishes internally, but desktop publishes a production release on
+  every `main` push. For the current shared-core rollout, stop at a build-only
+  feature PR and test APK: no merge, release tag, production release or promotion
+  until the user tests **all five apps** and explicitly approves production.
 
 ## Audio and device debugging
 

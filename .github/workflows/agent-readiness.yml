@@ -14,6 +14,7 @@ on:
       - rttyaf/gradle.properties
       - rttyaf/gradle/wrapper/**
       - rttyaf/app/build.gradle
+      - ham-radio-core/**
   workflow_dispatch:
 
 permissions:
@@ -44,20 +45,26 @@ jobs:
             command -v adb
           '
       - name: Host tests and debug APK (no device or secrets)
-        run: bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=2 testDebugUnitTest assembleDebug'
+        run: >-
+          bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=1
+          -Pkotlin.compiler.execution.strategy=in-process
+          -Dorg.gradle.jvmargs="-Xmx1536m -Dfile.encoding=UTF-8"
+          :ham-radio-core:test testDebugUnitTest assembleDebug'
       - name: Require executed tests and a debug APK
         run: |
           test -s rttyaf/app/build/outputs/apk/debug/app-debug.apk
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          reports = Path('rttyaf/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml')
-          suites = [ET.parse(report).getroot() for report in reports]
-          totals = {key: sum(int(suite.get(key, 0)) for suite in suites)
-                    for key in ('tests', 'skipped', 'failures', 'errors')}
-          print(totals)
-          assert totals['tests'] > totals['skipped'], 'No tests executed'
-          assert totals['failures'] == totals['errors'] == 0, 'Tests failed'
+          for directory in ('rttyaf/app/build/test-results/testDebugUnitTest',
+                            'ham-radio-core/build/test-results/test'):
+              reports = Path(directory).glob('TEST-*.xml')
+              suites = [ET.parse(report).getroot() for report in reports]
+              totals = {key: sum(int(suite.get(key, 0)) for suite in suites)
+                        for key in ('tests', 'skipped', 'failures', 'errors')}
+              print(directory, totals)
+              assert totals['tests'] > totals['skipped'], 'No tests executed'
+              assert totals['failures'] == totals['errors'] == 0, 'Tests failed'
           PY
       - name: Upload unit test results
         if: always()
@@ -65,5 +72,13 @@ jobs:
         with:
           name: agent-readiness-tests
           path: |
+            ham-radio-core/build/reports/tests/
+            ham-radio-core/build/test-results/
             rttyaf/app/build/reports/tests/
             rttyaf/app/build/test-results/
+      - name: Upload internal test APK (debug signing only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rttyaf-internal-debug-apk
+          path: rttyaf/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

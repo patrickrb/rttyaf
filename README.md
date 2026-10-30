@@ -46,7 +46,7 @@ In a fresh Linux x64 Amp orb, from the repository root:
 
 ```sh
 .agents/setup
-bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=2 testDebugUnitTest assembleDebug'
+bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs="-Xmx1536m -Dfile.encoding=UTF-8" :ham-radio-core:test testDebugUnitTest assembleDebug'
 ```
 
 Installing the resulting debug APK requires a connected Android device; see the development guide. Host tests do not require a device or credentials.

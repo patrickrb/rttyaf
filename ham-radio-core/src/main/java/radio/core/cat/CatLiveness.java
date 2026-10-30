@@ -1,4 +1,4 @@
-package com.k1af.rttyaf.rigs;
+package radio.core.cat;
 
 /**
  * Pure decision logic for the CAT connection liveness watchdog, kept separate from
