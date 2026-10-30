@@ -1,0 +1,69 @@
+name: Agent readiness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - AGENTS.md
+      - CLAUDE.md
+      - README.md
+      - docs/development.md
+      - .agents/**
+      - .github/workflows/agent-readiness.yml
+      - rttyaf/*.gradle
+      - rttyaf/gradle.properties
+      - rttyaf/gradle/wrapper/**
+      - rttyaf/app/build.gradle
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fresh-orb:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check setup syntax and executable bit
+        run: |
+          test -x .agents/setup
+          bash -n .agents/setup
+      - name: Cold setup
+        run: time .agents/setup
+      - name: Warm setup (idempotence)
+        run: time .agents/setup
+      - name: Verify a clean login shell
+        run: |
+          env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin /bin/bash -lc '
+            test "$JAVA_HOME" = /usr/lib/jvm/java-17-openjdk-amd64
+            test "$ANDROID_HOME" = "$HOME/.local/share/android-sdk"
+            test "$ANDROID_SDK_ROOT" = "$ANDROID_HOME"
+            java -version
+            command -v sdkmanager
+            command -v adb
+          '
+      - name: Host tests and debug APK (no device or secrets)
+        run: bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=2 testDebugUnitTest assembleDebug'
+      - name: Require executed tests and a debug APK
+        run: |
+          test -s rttyaf/app/build/outputs/apk/debug/app-debug.apk
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports = Path('rttyaf/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml')
+          suites = [ET.parse(report).getroot() for report in reports]
+          totals = {key: sum(int(suite.get(key, 0)) for suite in suites)
+                    for key in ('tests', 'skipped', 'failures', 'errors')}
+          print(totals)
+          assert totals['tests'] > totals['skipped'], 'No tests executed'
+          assert totals['failures'] == totals['errors'] == 0, 'Tests failed'
+          PY
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-readiness-tests
+          path: |
+            rttyaf/app/build/reports/tests/
+            rttyaf/app/build/test-results/

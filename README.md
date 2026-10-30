@@ -1,12 +1,12 @@
 # RTTYAF
 
-**FT8 on Android — modernized.**
+**RTTY on Android — modernized.**
 
 🌐 **[rttyaf.app](https://rttyaf.app)** · 💬 **[Join the Discord](https://discord.gg/tz4spm5nWB)**
 
 A fork of [FT8CN](https://github.com/N0BOY/FT8CN) that takes the excellent original and brings it forward: a Jetpack Compose UI, full English localization, dozens of bug fixes, and a pile of new operating features built for real on-the-air use.
 
-Run FT8 natively on your Android phone or tablet, drive your radio over USB CAT, decode the band, and work the world from anywhere.
+Run RTTY natively on your Android phone or tablet, drive your radio over USB CAT, decode the band, and work the world from anywhere.
 
 ---
 
@@ -40,20 +40,24 @@ Run FT8 natively on your Android phone or tablet, drive your radio over USB CAT,
 
 ## Install
 
-Grab the latest APK from the [Releases](https://github.com/patrickrb/rttyaf/releases) page, or build it yourself:
+Grab the latest APK from the [Releases](https://github.com/patrickrb/rttyaf/releases) page. To build from source, start with [development setup and verified build/test commands](docs/development.md). Coding agents should read [AGENTS.md](AGENTS.md).
 
-```bash
-cd rttyaf
-./gradlew installDebug
+In a fresh Linux x64 Amp orb, from the repository root:
+
+```sh
+.agents/setup
+bash -lc 'cd rttyaf && ./gradlew --no-daemon --max-workers=2 testDebugUnitTest assembleDebug'
 ```
+
+Installing the resulting debug APK requires a connected Android device; see the development guide. Host tests do not require a device or credentials.
 
 ---
 
 ## Native code
 
-The FT8 DSP core is a vendored copy of [kgoba's ft8_lib](https://github.com/kgoba/ft8_lib), pinned to a specific upstream commit — see [`rttyaf/app/src/main/cpp/ft8_lib/FT8_LIB_PIN.txt`](rttyaf/app/src/main/cpp/ft8_lib/FT8_LIB_PIN.txt) for the exact hash. App-specific JNI glue lives alongside it in `rttyaf/app/src/main/cpp/rttyaf_glue/`. All of it is built from source by the NDK/CMake toolchain into a single `librttyaf.so`, so a fresh clone or worktree builds with no manual copying.
+The RTTY modem is pure Kotlin in [`rttyaf/app/src/main/kotlin/radio/ks3ckc/rttyaf/rtty/`](rttyaf/app/src/main/kotlin/radio/ks3ckc/rttyaf/rtty/). Native code in [`rttyaf/app/src/main/cpp/`](rttyaf/app/src/main/cpp/) is the libusb/JNI USB audio bridge, built from source with NDK/CMake into `librttyaf.so`. Fresh clones and worktrees need no prebuilt library copying.
 
-Historical note: the app formerly shipped a closed prebuilt `libft8cn.so` — a JNI wrapper around kgoba ft8_lib @ `6f528128`. It is no longer used and no longer present in the repository; the from-source build replaced it entirely.
+The former FT8 DSP core and `libft8cn.so` are no longer part of the Android app. The legacy desktop/iOS FT8 ports still reference removed sources; see the [documented limitations](docs/development.md#legacy-ports-and-boundaries) before working on them.
 
 ---
 
