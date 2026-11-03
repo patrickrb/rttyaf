@@ -11,33 +11,22 @@ from internal_approval import require_source
 
 PACKAGE = "radio.ks3ckc.rttyaf"
 API = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PACKAGE}"
+PUBLISHED = "RELEASE_LIFECYCLE_STATE_PUBLISHED"
 
 
 def fetch_tracks(session):
-    # An uncommitted edit reads currently committed state. Delete it, never commit
-    # it or send a tracks.update request. Do not reuse the publisher's edit.
-    response = session.post(f"{API}/edits", timeout=30)
-    response.raise_for_status()
-    edit_id = response.json()["id"]
-    try:
-        tracks = {}
-        for track in ("internal", "production"):
-            response = session.get(f"{API}/edits/{edit_id}/tracks/{track}", timeout=30)
-            if response.status_code == 404:
-                tracks[track] = []
-                continue
-            response.raise_for_status()
-            data = response.json()
-            if data.get("track") != track:
-                raise ValueError("Play returned an unexpected track")
-            # Preserve all release fields so a change in production's status,
-            # fraction, notes, etc. also fails the before/after comparison.
-            tracks[track] = sorted(data.get("releases", []),
-                                   key=lambda release: json.dumps(release, sort_keys=True))
-        return {"packageName": PACKAGE, "tracks": tracks}
-    finally:
-        response = session.delete(f"{API}/edits/{edit_id}", timeout=30)
+    # GET-only: creating even an uncommitted edit can invalidate a publisher's
+    # active edit. This API exposes at most 20 non-obsolete ReleaseSummary items.
+    tracks = {}
+    for track in ("internal", "production"):
+        response = session.get(f"{API}/tracks/{track}/releases", timeout=30)
         response.raise_for_status()
+        releases = response.json().get("releases", [])
+        for release in releases:
+            if release.get("track") != track:
+                raise ValueError("Play returned an unexpected track")
+        tracks[track] = sorted(releases, key=lambda release: json.dumps(release, sort_keys=True))
+    return {"packageName": PACKAGE, "tracks": tracks}
 
 
 def build_receipt(before, after, metadata, release_name, source_sha):
@@ -48,11 +37,13 @@ def build_receipt(before, after, metadata, release_name, source_sha):
         raise ValueError("Expected one release APK version")
     version = str(metadata["elements"][0]["versionCode"])
     matches = [release for release in after["tracks"]["internal"]
-               if version in [str(code) for code in release.get("versionCodes", [])]
-               and release.get("name") == release_name]
+               if int(version) in [artifact.get("versionCode")
+                                   for artifact in release.get("activeArtifacts", [])]
+               and release.get("releaseName") == release_name
+               and release.get("track") == "internal"]
     production_unchanged = before["tracks"]["production"] == after["tracks"]["production"]
-    statuses = [release.get("status") for release in matches]
-    verified = len(matches) == 1 and statuses == ["completed"] and production_unchanged
+    states = [release.get("releaseLifecycleState") for release in matches]
+    verified = len(matches) == 1 and states == [PUBLISHED] and production_unchanged
     return {
         "packageName": PACKAGE,
         "sourceSha": source_sha,
@@ -60,14 +51,18 @@ def build_receipt(before, after, metadata, release_name, source_sha):
         "versionCode": version,
         "versionName": metadata["elements"][0]["versionName"],
         "releaseName": release_name,
-        "observedStatuses": statuses,
+        "observedLifecycleStates": states,
+        "publisherRequestedStatus": "completed",
         "verified": verified,
-        "productionUnchanged": production_unchanged,
-        "productionBefore": before["tracks"]["production"],
-        "productionAfter": after["tracks"]["production"],
+        "verificationScope": "matching published internal release summary, not rollout completion",
+        "productionSummariesUnchanged": production_unchanged,
+        "productionComparisonScope": "at most 20 non-obsolete summaries; no notes or rollout fraction",
+        "productionSummaryBefore": before["tracks"]["production"],
+        "productionSummaryAfter": after["tracks"]["production"],
         "internalReleases": after["tracks"]["internal"],
-        "testerRollout": ("completed internal track release; enrollment/propagation unverified"
-                          if statuses == ["completed"] else "not confirmed; draft is not rollout"),
+        "testerRollout": ("published on internal; may be partial/halted; enrollment/propagation unverified"
+                          if states == [PUBLISHED] else "not confirmed; draft is not rollout"),
+        "rolloutCompletion": "not exposed by ReleaseSummary; PUBLISHED is not proof of completed",
         "deviceAvailability": "not verified",
         "physicalUsbCatPttRf": "not tested",
     }
@@ -109,7 +104,7 @@ def main():
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(json.dumps(result, sort_keys=True))
     if args.command == "after" and not result["verified"]:
-        raise SystemExit("Internal delivery unverified or production state changed; see receipt")
+        raise SystemExit("Internal publication unverified or production summaries changed; see receipt")
 
 
 if __name__ == "__main__":

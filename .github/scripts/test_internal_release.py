@@ -175,55 +175,67 @@ class ApprovalTest(unittest.TestCase):
 class ReceiptTest(unittest.TestCase):
     def setUp(self):
         self.before = {"packageName": PACKAGE, "tracks": {"internal": [], "production": [
-            {"name": "stable", "status": "completed", "versionCodes": ["1009"]}]}}
+            {"releaseName": "stable", "track": "production",
+             "releaseLifecycleState": "RELEASE_LIFECYCLE_STATE_PUBLISHED",
+             "activeArtifacts": [{"versionCode": 1009}]}]}}
         self.after = copy.deepcopy(self.before)
         self.after["tracks"]["internal"] = [
-            {"name": "android-dev.61", "status": "completed", "versionCodes": ["1061"]}]
+            {"releaseName": "android-dev.61", "track": "internal",
+             "releaseLifecycleState": "RELEASE_LIFECYCLE_STATE_PUBLISHED",
+             "activeArtifacts": [{"versionCode": 1061}]}]
         self.metadata = {"applicationId": PACKAGE, "variantName": "release",
                          "elements": [{"versionCode": 1061, "versionName": "1.2.1-dev.61"}]}
 
     def receipt(self):
         return build_receipt(self.before, self.after, self.metadata, "android-dev.61", "abc123")
 
-    def test_exact_completed_release_reports_identity_and_hardware_limits(self):
+    def test_exact_published_summary_reports_identity_and_explicit_rollout_limits(self):
         receipt = self.receipt()
         self.assertTrue(receipt["verified"])
         self.assertEqual("1.2.1-dev.61", receipt["versionName"])
-        self.assertEqual((PACKAGE, "internal", "1061", ["completed"], "abc123"),
+        self.assertEqual((PACKAGE, "internal", "1061", ["RELEASE_LIFECYCLE_STATE_PUBLISHED"], "abc123"),
                          tuple(receipt[k] for k in ("packageName", "track", "versionCode",
-                                                    "observedStatuses", "sourceSha")))
+                                                    "observedLifecycleStates", "sourceSha")))
+        self.assertIn("not proof of completed", receipt["rolloutCompletion"])
+        self.assertIn("partial/halted", receipt["testerRollout"])
+        self.assertIn("no notes or rollout fraction", receipt["productionComparisonScope"])
         self.assertEqual("not verified", receipt["deviceAvailability"])
         self.assertIn("enrollment/propagation unverified", receipt["testerRollout"])
         self.assertEqual("not tested", receipt["physicalUsbCatPttRf"])
 
-    def test_draft_halted_or_in_progress_is_not_confirmed_rollout(self):
-        for status in ("draft", "halted", "inProgress"):
+    def test_draft_review_pending_or_approved_unpublished_is_not_published(self):
+        for status in ("RELEASE_LIFECYCLE_STATE_DRAFT", "RELEASE_LIFECYCLE_STATE_IN_REVIEW",
+                       "RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED", "", "PUBLISHED"):
             with self.subTest(status=status):
-                self.after["tracks"]["internal"][0]["status"] = status
+                self.after["tracks"]["internal"][0]["releaseLifecycleState"] = status
                 result = self.receipt()
                 self.assertFalse(result["verified"])
-                self.assertEqual([status], result["observedStatuses"])
+                self.assertEqual([status], result["observedLifecycleStates"])
                 self.assertIn("not confirmed", result["testerRollout"])
 
     def test_wrong_version_or_name_and_missing_release_are_not_success(self):
-        for field, value in [("versionCodes", ["1060"]), ("name", "android-dev.60")]:
+        for field, value in [("activeArtifacts", [{"versionCode": 1060}]),
+                             ("activeArtifacts", [{"versionCode": "1061"}]),
+                             ("releaseName", "android-dev.60"), ("track", "production")]:
             with self.subTest(field=field):
                 changed = copy.deepcopy(self.after)
                 changed["tracks"]["internal"][0][field] = value
                 self.assertFalse(build_receipt(self.before, changed, self.metadata,
                                                "android-dev.61", "abc")["verified"])
-        self.after["tracks"]["internal"] = []
-        self.assertFalse(self.receipt()["verified"])
+        for releases in (self.after["tracks"]["internal"] * 2, []):
+            self.after["tracks"]["internal"] = releases
+            self.assertFalse(self.receipt()["verified"])
 
-    def test_production_version_status_and_fraction_changes_fail_verification(self):
-        for field, value in [("versionCodes", ["1061"]), ("status", "inProgress"),
-                             ("userFraction", 0.1)]:
+    def test_observed_production_summary_changes_fail_verification(self):
+        for field, value in [("activeArtifacts", [{"versionCode": 1061}]),
+                             ("releaseLifecycleState", "RELEASE_LIFECYCLE_STATE_DRAFT"),
+                             ("releaseName", "changed")]:
             with self.subTest(field=field):
                 changed = copy.deepcopy(self.after)
                 changed["tracks"]["production"][0][field] = value
                 receipt = build_receipt(self.before, changed, self.metadata, "android-dev.61", "abc")
                 self.assertFalse(receipt["verified"])
-                self.assertFalse(receipt["productionUnchanged"])
+                self.assertFalse(receipt["productionSummariesUnchanged"])
 
     def test_wrong_package_debug_variant_or_multiple_outputs_are_rejected(self):
         for field, value in [("applicationId", "radio.ks3ckc.ft8af"),
@@ -247,7 +259,7 @@ class ReceiptTest(unittest.TestCase):
                 self.assertIn("requires the exact reviewed feat/* SHA", result.stderr)
                 self.assertFalse(output.exists())
 
-    def test_fresh_edit_readback_preserves_production_fields_and_handles_empty_track(self):
+    def test_get_only_readback_handles_empty_track_without_edit_methods(self):
         class Response:
             def __init__(self, data, status=200):
                 self.data, self.status_code = data, status
@@ -260,23 +272,42 @@ class ReceiptTest(unittest.TestCase):
                 return self.data
 
         class Session:
-            def post(self, url, timeout):
-                return Response({"id": "fresh-edit"})
-
             def get(self, url, timeout):
-                if url.endswith("/internal"):
-                    return Response({}, 404)
-                return Response({"track": "production", "releases": [
-                    {"name": "stable", "userFraction": 0.25, "status": "inProgress"}]})
-
-            def delete(self, url, timeout):
-                return Response({})
+                if url == f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PACKAGE}/tracks/internal/releases":
+                    return Response({})
+                if url == f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{PACKAGE}/tracks/production/releases":
+                    return Response({"releases": [{"track": "production", "releaseName": "stable",
+                        "activeArtifacts": [{"versionCode": 1009}],
+                        "releaseLifecycleState": "RELEASE_LIFECYCLE_STATE_PUBLISHED"}]})
+                raise AssertionError(f"Unexpected endpoint: {url}")
 
         result = fetch_tracks(Session())
         self.assertEqual(PACKAGE, result["packageName"])
         self.assertEqual([], result["tracks"]["internal"])
-        self.assertEqual([{"name": "stable", "userFraction": 0.25, "status": "inProgress"}],
+        self.assertEqual([{"track": "production", "releaseName": "stable",
+                           "activeArtifacts": [{"versionCode": 1009}],
+                           "releaseLifecycleState": "RELEASE_LIFECYCLE_STATE_PUBLISHED"}],
                          result["tracks"]["production"])
+
+    def test_wrong_track_or_api_failure_is_not_an_empty_success(self):
+        class Session:
+            def __init__(self, fail):
+                self.fail = fail
+
+            def get(self, url, timeout):
+                return self
+
+            def raise_for_status(self):
+                if self.fail:
+                    raise RuntimeError("HTTP failure")
+
+            def json(self):
+                return {"releases": [{"track": "production"}]}
+
+        with self.assertRaises(ValueError):
+            fetch_tracks(Session(False))
+        with self.assertRaises(RuntimeError):
+            fetch_tracks(Session(True))
 
 
 if __name__ == "__main__":

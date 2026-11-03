@@ -62,18 +62,26 @@ owner-approved external protection/credential boundary; do not invent one here.
    only inside the authorized job. Do not download/expose them or create new keys.
    Dispatch runs `:ham-radio-core:test` separately from app tests. Play failures
    are blocking in this lane; the older main/tag warn-only behavior is unchanged.
-5. Retain the `play-internal-readback` artifact: a fresh authenticated, disposable
-   edit reads **committed** `radio.ks3ckc.rttyaf` internal and production state
-   before/after publishing, without updating tracks or committing the read edit.
-   Verification requires the built release APK's exact versionCode and release
-   name on internal with **completed** status and unchanged full production state.
-   Draft/halted/inProgress or mismatches are not successful tester rollout. If a
+5. Retain the `play-internal-readback` artifact: authenticated **GET-only**
+   `applications/{package}/tracks/{track}/releases` reads RTTYAF internal and
+   production release summaries before/after publishing. It creates/commits/deletes
+   **no edits** and updates no tracks. Verification requires the built release
+   APK's exact integer versionCode and releaseName on internal with raw lifecycle
+   **RELEASE_LIFECYCLE_STATE_PUBLISHED**, and unchanged exposed production summaries.
+   Draft/review-pending/approved-but-unpublished or mismatches fail verification.
+   The workflow requests `completed`, but **PUBLISHED is not proof of completed**:
+   [Google's schema](https://developers.google.com/android-publisher/api-ref/rest/v3/applications.tracks.releases)
+   includes partial/halted releases. The API returns at most 20 non-obsolete
+   summaries, no notes/versionName/rollout fraction. The receipt labels these
+   limits; production-summary equality is not full production-state proof.
+   VersionName is local build metadata, not an observed Play field. If a
    failure happens after upload, read-back still runs on publisher success/failure
    (unless cancelled); inspect actual Play state before retrying.
-   Even completed does not prove tester enrollment/propagation or device availability.
+   Published does not prove tester enrollment/propagation or device availability.
    The inherited scheduled Play watcher uses a separate concurrency group and
-   can invalidate a publisher edit using the same service account. Android release
-   runs serialize with each other, not with that watcher. Report such a failure;
+   can still invalidate the publisher's upload edit using the same service account;
+   GET-only read-back cannot. Android release runs serialize with each other,
+   not with that watcher. Report such a failure;
    never disable the watcher, change default-branch automation or retry blindly.
 6. Provide source SHA, APK download, SHA256, package/version and per-suite results
    plus CI/read-back links. Debug fallback APKs cannot upgrade a differently signed
