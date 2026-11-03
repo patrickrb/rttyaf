@@ -70,9 +70,16 @@ No web server or `.agents/resume` is needed for the host build/test workflow.
 - Pushes, PR creation, merges and releases require the user's authorization.
   Merging to `main` triggers publishing; do not trigger it merely to verify setup.
   Android publishes internally, but desktop publishes a production release on
-  every `main` push. For the current shared-core rollout, stop at a build-only
-  feature PR and test APK: no merge, release tag, production release or promotion
-  until the user tests **all five apps** and explicitly approves production.
+  every `main` push. For the current shared-core rollout, **never merge main or
+  push production tags**. The Android workflow's INTERNAL-only feature-ref
+  dispatch requires Reid-n0rc's approval of the exact commit on an open, ready
+  PR and GitHub's clean mergeability state; agent review is not human approval.
+  Follow [the internal handoff](docs/release-pipeline.md#reviewed-feature-ref-internal-delivery).
+  No protection/environment changes or bypasses. If review or hosted dispatch
+  is blocked, provide a debug APK and the exact blocker, not a main-merge shortcut.
+  No production release or promotion until Patrick tests **all five apps** and
+  subsequently explicitly approves production. Host/emulator CI is not physical
+  USB/CAT/PTT/RF validation; an uploaded AAB is not verified Play delivery.
 
 ## Audio and device debugging
 

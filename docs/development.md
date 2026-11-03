@@ -80,10 +80,13 @@ core test suite.
 
 Do not merge this integration to `main`: although Android's main lane publishes
 to Play internal, the desktop workflow also creates a **production** desktop
-release on every main push. Keep the feature PR build-only and distribute the
-debug APK for internal testing. Do not alter release automation to bypass this.
-No production release, tag or promotion is authorized until the user tests all
-five apps (FT8AF, RTTYAF, SSTVAF, ROTA, JTTYAF) and explicitly approves.
+release on every main push. Use the
+[reviewed feature-ref INTERNAL dispatch](release-pipeline.md#reviewed-feature-ref-internal-delivery)
+only after the exact head commit has independent human approval and normal CI /
+protection gates pass. Keep the PR unmerged; while blocked, distribute the debug
+APK and report the blocker. Do not change protections or bypass human review.
+No production release, production tag or promotion is authorized until Patrick
+tests all five apps (FT8AF, RTTYAF, SSTVAF, ROTA, JTTYAF) and explicitly approves.
 
 Debug APKs use a development signing key, not the Play/release key, and cannot
 replace a differently signed installed app. Back up/export logs and settings

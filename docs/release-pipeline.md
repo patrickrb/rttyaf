@@ -3,10 +3,90 @@
 > **Shared-core rollout: internal testing only.** Do not merge to `main` as an
 > internal-only delivery shortcut: the existing desktop workflow unconditionally
 > creates a non-prerelease `desktop-v*` release on main pushes, even when no
-> desktop files changed. Keep this rollout on a build-only feature PR and use a
-> test APK. No production release, promotion or rollout until the user tests
+> desktop files changed. Use the reviewed feature-ref INTERNAL dispatch below;
+> while blocked, provide a test APK. No production release, promotion or rollout until Patrick tests
 > **all five apps** (FT8AF, RTTYAF, SSTVAF, ROTA, JTTYAF) and explicitly approves.
-> Do not modify release automation to bypass this boundary.
+> Do not change protections/environments or bypass human review to deliver it.
+
+## Reviewed feature-ref internal delivery
+
+The Android workflow has an **INTERNAL-only** manual entry point. It does not
+need a main merge, a new internal/staging branch, production tags, new signing
+material or new services. Existing main/tag routing below is historical behavior,
+not authorization to run those lanes during the all-five-app hold.
+
+**Trust boundary:** this is a release-policy check for trusted repository writers
+and the operator selecting the reviewed ref, not tamper-proof credential isolation
+from those writers. Both workflow and guard script come from the feature commit;
+a writer can edit them. Independently inspect the exact approved SHA before
+dispatch. If enforcement against repository writers is required, stop for an
+owner-approved external protection/credential boundary; do not invent one here.
+
+1. Open a ready PR to main from a same-repository `feat/*` branch containing
+   the combined source and lane changes. Keep it **DO NOT MERGE**, with no
+   auto-merge. Request **Reid-n0rc** as the independent writer/non-author reviewer.
+   He must submit **Approve** for the **exact current head commit**, not a comment
+   or approval of an earlier commit. Agent review does not substitute for this.
+2. Wait for normal required CI/review gates. Dispatch requires GitHub's current
+   `mergeable_state` to be `clean` (eligibility only, **never actually merge**).
+   Unknown, blocked, behind or failed states fail closed. Do not infer permission
+   from empty rules, an inaccessible protection endpoint, or a secret-list 403.
+   Preserve all existing human/environment gates; do not add an unprotected lane
+   or change settings to make the check pass. Review must be renewed after a push.
+   The workflow rechecks live approval before signing, before the Play snapshot /
+   GitHub prerelease, and immediately before Play publishing. Approval is evaluated
+   at those checks, not continuously; revocation after the last check cannot cancel
+   an API operation already in flight. Dispatch-time pending checks may itself
+   affect GitHub mergeability: if it fails closed, report the observed state, do
+   not relax the check just to obtain delivery.
+3. With owner authorization for internal delivery, dispatch the existing registered
+   Android workflow **on that feature ref**, setting `reviewed_sha` to its exact
+   approved 40-character commit. For example, after substituting the actual SHA:
+
+   ```sh
+   gh workflow run android.yml --repo patrickrb/rttyaf \
+     --ref feat/internal-readiness-shared-core -f reviewed_sha=<approved-head-sha>
+   ```
+
+   The source guard rejects main, every tag, wrong repos and SHA mismatches before
+   credentials are used. It verifies the named human still has write access and
+   has not dismissed approval or requested changes. No track/status inputs exist:
+   dispatch always selects **internal**, **completed**, and a GitHub **prerelease**
+   `android-dev.<run#>` at the built SHA. That tag and feature pushes do not match
+   desktop/iOS publishing triggers. If GitHub refuses feature-ref dispatch because
+   default-branch registration is insufficient, report the exact response and
+   stop; do not merge main or bootstrap a bypass. Existing Android workflow
+   registration is visible in `gh workflow list` but is not proof of successful
+   feature-ref dispatch.
+4. Existing hosted signing and `PLAY_SERVICE_ACCOUNT_JSON` secrets are reused
+   only inside the authorized job. Do not download/expose them or create new keys.
+   Dispatch runs `:ham-radio-core:test` separately from app tests. Play failures
+   are blocking in this lane; the older main/tag warn-only behavior is unchanged.
+5. Retain the `play-internal-readback` artifact: a fresh authenticated, disposable
+   edit reads **committed** `radio.ks3ckc.rttyaf` internal and production state
+   before/after publishing, without updating tracks or committing the read edit.
+   Verification requires the built release APK's exact versionCode and release
+   name on internal with **completed** status and unchanged full production state.
+   Draft/halted/inProgress or mismatches are not successful tester rollout. If a
+   failure happens after upload, read-back still runs on publisher success/failure
+   (unless cancelled); inspect actual Play state before retrying.
+   Even completed does not prove tester enrollment/propagation or device availability.
+   The inherited scheduled Play watcher uses a separate concurrency group and
+   can invalidate a publisher edit using the same service account. Android release
+   runs serialize with each other, not with that watcher. Report such a failure;
+   never disable the watcher, change default-branch automation or retry blindly.
+6. Provide source SHA, APK download, SHA256, package/version and per-suite results
+   plus CI/read-back links. Debug fallback APKs cannot upgrade a differently signed
+   installed app; export data before uninstalling (uninstall deletes it). A signed
+   GitHub APK uses the existing release/upload key, which may differ from the Play
+   App Signing key; do not promise it can replace a Play-installed app. No local
+   device means no physical USB/CAT/PTT/RF or on-air validation.
+
+Credential-free safeguard validation:
+
+```sh
+uv run --with PyYAML python -m unittest discover -s .github/scripts -p 'test_*.py' -v
+```
 
 Three platforms (Android, desktop, iOS) build and release **independently** —
 each has its own workflow, its own path filter, its own tag namespace, and its

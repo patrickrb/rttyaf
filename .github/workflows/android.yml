@@ -7,6 +7,7 @@ name: Android CI & Release
 #
 # Release lifecycle (see docs/release-pipeline.md):
 #   PR to main          -> build-only (unsigned), tests
+#   reviewed feat/* dispatch -> Android-only prerelease + verified Play INTERNAL
 #   push to main        -> android-dev.<run#> PRERELEASE + Play INTERNAL track
 #   android-v* tag push -> release + Play PRODUCTION track
 # RTTYAF develops straight to main (no dev/staging promotion chain — that was
@@ -28,6 +29,12 @@ on:
       - 'android-v*'
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact feat/* commit approved by Reid-n0rc on its open PR (INTERNAL ONLY)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -42,17 +49,34 @@ permissions:
 concurrency:
   group: >-
     ${{
-      (github.event_name == 'push'
+      ((github.event_name == 'workflow_dispatch') || (github.event_name == 'push'
         && (github.ref == 'refs/heads/main'
-          || startsWith(github.ref, 'refs/tags/android-v')))
+          || startsWith(github.ref, 'refs/tags/android-v'))))
       && 'play-publish'
       || format('build-{0}', github.run_id)
     }}
   cancel-in-progress: false
 
 jobs:
+  authorize-internal:
+    name: Verify independent approval for exact internal source
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require Reid's current-commit approval without changing protections
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: python3 .github/scripts/internal_approval.py
+
   detect:
     name: Detect Android changes
+    needs: authorize-internal
+    if: ${{ always() && (github.event_name != 'workflow_dispatch' || needs.authorize-internal.result == 'success') }}
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.decide.outputs.run }}
@@ -69,6 +93,7 @@ jobs:
               - 'rttyaf/**'
               - 'ham-radio-core/**'
               - '.github/workflows/android.yml'
+              - '.github/scripts/**'
 
       - name: Decide whether to run
         id: decide
@@ -79,7 +104,7 @@ jobs:
           # main pushes and android-v* tags always build the full release
           # snapshot; otherwise (PRs) build only when Android-relevant files
           # changed.
-          if [[ "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF" == "refs/heads/main" || "$GITHUB_REF" == refs/tags/android-v* ) ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || ( "$GITHUB_EVENT_NAME" == "push" && ( "$GITHUB_REF" == "refs/heads/main" || "$GITHUB_REF" == refs/tags/android-v* ) ) ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           elif [[ "$CHANGED" == "true" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -90,7 +115,7 @@ jobs:
   test:
     name: Unit tests & coverage
     needs: detect
-    if: ${{ needs.detect.outputs.run == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    if: ${{ needs.detect.outputs.run == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -139,11 +164,16 @@ jobs:
 
       - name: Run unit tests
         working-directory: rttyaf
-        run: ./gradlew :ham-radio-core:test testDebugUnitTest --stacktrace
+        run: ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' :ham-radio-core:test testDebugUnitTest --stacktrace
+
+      - name: Test internal publishing safeguards (no credentials)
+        run: |
+          python -m pip install --quiet PyYAML
+          python -m unittest discover -s .github/scripts -p 'test_*.py' -v
 
       - name: Generate coverage report
         working-directory: rttyaf
-        run: ./gradlew jacocoTestReport --stacktrace
+        run: ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' jacocoTestReport --stacktrace
 
       - name: Upload coverage to Codecov
         continue-on-error: true
@@ -177,7 +207,7 @@ jobs:
     # checks while it stabilises (issue #60) — a flaky emulator must never block
     # a release.
     needs: detect
-    if: ${{ needs.detect.outputs.run == 'true' && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    if: ${{ needs.detect.outputs.run == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-latest
 
     steps:
@@ -223,7 +253,7 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do
-            if ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace; then
+            if ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' assembleDebug assembleDebugAndroidTest --stacktrace; then
               exit 0
             fi
             echo "::warning::Gradle assemble failed (attempt ${attempt}/3) — retrying after backoff"
@@ -259,7 +289,7 @@ jobs:
             # test signal.
             adb logcat -s TestRunner:I AndroidRuntime:E '*:F' &
             logcat_pid=$!
-            ./gradlew connectedDebugAndroidTest --stacktrace
+            ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' connectedDebugAndroidTest --stacktrace
             status=$?
             kill "$logcat_pid" 2>/dev/null || true
             exit $status
@@ -320,19 +350,19 @@ jobs:
         id: lint
         continue-on-error: true
         working-directory: rttyaf
-        run: ./gradlew lintDebug --stacktrace
+        run: ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' lintDebug --stacktrace
 
       - name: detekt
         id: detekt
         continue-on-error: true
         working-directory: rttyaf
-        run: ./gradlew detekt --stacktrace
+        run: ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' detekt --stacktrace
 
       - name: ktlint
         id: ktlint
         continue-on-error: true
         working-directory: rttyaf
-        run: ./gradlew ktlintCheck --stacktrace
+        run: ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' ktlintCheck --stacktrace
 
       - name: Upload analysis reports
         if: always()
@@ -353,6 +383,9 @@ jobs:
     # push) or were skipped (tags). Block only on actual test failure/cancel.
     if: ${{ always() && needs.detect.outputs.run == 'true' && needs.test.result != 'failure' && needs.test.result != 'cancelled' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
 
     steps:
       - name: Checkout repository
@@ -376,13 +409,19 @@ jobs:
           # production is cut only by deliberately pushing an android-v* tag.
           # The android- prefix keeps these tags separate from the desktop-v*
           # lane on the Releases page.
+          # Dispatch can NEVER select main or a production tag. The separate
+          # authorization job also requires approval of this exact feat/* SHA.
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$GITHUB_REF" != refs/heads/feat/* ]]; then
+            echo "::error::Internal dispatch requires a reviewed feat/* ref"
+            exit 1
+          fi
           if [[ "${GITHUB_REF}" == refs/tags/android-v* ]]; then
             echo "release_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             echo "version_name=${GITHUB_REF_NAME#android-v}" >> "$GITHUB_OUTPUT"
             echo "should_release=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
             echo "play_track=production" >> "$GITHUB_OUTPUT"
-          elif [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF}" == "refs/heads/main" ]]; then
+          elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" || ( "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/main" ) ]]; then
             # main pushes (a feature-PR merge) cut a run-numbered PRERELEASE,
             # published to the Play internal track. Distinct prefix so it sorts
             # separately from android-v* and so the Play releaseName
@@ -465,6 +504,13 @@ jobs:
           echo "::error::Failed to install NDK $NDK_VERSION after 3 attempts"
           exit 1
 
+      - name: Recheck exact human approval before signing
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: python3 .github/scripts/internal_approval.py
+
       - name: Decode keystore (release builds only)
         if: steps.tag.outputs.should_release == 'true'
         env:
@@ -499,7 +545,7 @@ jobs:
               "-PRELEASE_KEY_ALIAS=$RELEASE_KEY_ALIAS" \
               "-PRELEASE_KEY_PASSWORD=$RELEASE_KEY_PASSWORD")
           fi
-          ./gradlew "${args[@]}"
+          ./gradlew --no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx1536m -Dfile.encoding=UTF-8' "${args[@]}"
 
       - name: Rename APK
         if: steps.tag.outputs.should_release == 'true'
@@ -541,6 +587,19 @@ jobs:
           name: rttyaf-release-mapping
           path: rttyaf/app/build/outputs/mapping/release/mapping.txt
 
+      # Reviewed feature-ref dispatch cannot trigger desktop publishing.
+      # Reuse the existing Play secret without exporting it.
+      - name: Snapshot Play tracks before internal publishing
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: |
+          python3 .github/scripts/internal_approval.py
+          python -m pip install --quiet google-auth requests
+          python .github/scripts/play_internal_receipt.py before "$RUNNER_TEMP/play-before.json"
+
       - name: Create GitHub Release
         if: steps.tag.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
@@ -566,7 +625,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Publishing to Play is a best-effort DEPLOY side-effect, not a build
+      - name: Recheck exact human approval before Play publishing
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: python3 .github/scripts/internal_approval.py
+
+      # Legacy main/tag publishing is a best-effort DEPLOY side-effect, not a build
       # signal — by this point the signed APK/AAB is already built and the
       # GitHub Release is published. The Play upload can still fail on external
       # Play Console track state outside CI's control (e.g. "You cannot
@@ -579,7 +645,7 @@ jobs:
       - name: Publish AAB to Play
         id: play_publish
         if: steps.tag.outputs.should_release == 'true'
-        continue-on-error: true
+        continue-on-error: ${{ github.event_name != 'workflow_dispatch' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
@@ -596,10 +662,31 @@ jobs:
           # ReleaseMetadataTest enforces the limit).
           whatsNewDirectory: distribution/whatsnew
 
+      - name: Verify committed Play internal package/version/status
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && (steps.play_publish.outcome == 'success' || steps.play_publish.outcome == 'failure') }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          EXPECTED_RELEASE_NAME: ${{ steps.tag.outputs.release_tag }}
+        run: |
+          python .github/scripts/play_internal_receipt.py after \
+            "$RUNNER_TEMP/play-before.json" \
+            rttyaf/app/build/outputs/apk/release/output-metadata.json \
+            "$EXPECTED_RELEASE_NAME" "$RUNNER_TEMP/play-internal-receipt.json"
+
+      - name: Upload authenticated internal delivery evidence
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: play-internal-readback
+          path: |
+            ${{ runner.temp }}/play-before.json
+            ${{ runner.temp }}/play-internal-receipt.json
+
       # Make a swallowed publish failure visible (annotation on the run) without
       # failing the job — the artifact + GitHub Release already succeeded.
       - name: Warn if Play publish failed
-        if: steps.tag.outputs.should_release == 'true' && steps.play_publish.outcome == 'failure'
+        if: github.event_name != 'workflow_dispatch' && steps.tag.outputs.should_release == 'true' && steps.play_publish.outcome == 'failure'
         run: |
           echo "::warning::Play publish (track=${{ steps.tag.outputs.play_track }}) failed for ${{ steps.tag.outputs.release_tag }} (non-blocking). The signed AAB built and the GitHub Release was created; only the Play upload did not complete. Check the 'Publish AAB to Play' step log — common causes are an upgrade-path rejection or an expired Play edit."
 
@@ -615,18 +702,19 @@ jobs:
     # `detect` is included: a `detect` failure skips `test`/`build`, and a skip
     # alone would otherwise be read as "nothing to do" and pass the gate — so
     # its result is checked directly.
-    needs: [detect, test, build]
+    needs: [authorize-internal, detect, test, build]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Verify required Android jobs succeeded or were skipped
         env:
+          APPROVAL_RESULT: ${{ needs.authorize-internal.result }}
           DETECT_RESULT: ${{ needs.detect.result }}
           TEST_RESULT: ${{ needs.test.result }}
           BUILD_RESULT: ${{ needs.build.result }}
         run: |
           set -euo pipefail
-          for r in "$DETECT_RESULT" "$TEST_RESULT" "$BUILD_RESULT"; do
+          for r in "$APPROVAL_RESULT" "$DETECT_RESULT" "$TEST_RESULT" "$BUILD_RESULT"; do
             if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
               echo "::error::A required Android job did not pass (detect=$DETECT_RESULT test=$TEST_RESULT build=$BUILD_RESULT)"
               exit 1
