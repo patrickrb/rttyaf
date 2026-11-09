@@ -20,6 +20,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import radio.core.audio.FirDecimator;
+import radio.core.audio.RationalResampler;
+import radio.core.usb.UacAudioFormats;
+
 /**
  * USB Audio Class 1.0 device handler for direct USB audio communication.
  * Bypasses Android's audio framework to work with USB audio devices

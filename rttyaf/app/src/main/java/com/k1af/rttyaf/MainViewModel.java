@@ -81,7 +81,7 @@ import com.k1af.rttyaf.log.ThirdPartyService;
 import com.k1af.rttyaf.rigs.BaseRig;
 import com.k1af.rttyaf.rigs.BaseRigOperation;
 import com.k1af.rttyaf.rigs.CatConnectionState;
-import com.k1af.rttyaf.rigs.CatLiveness;
+import radio.core.cat.CatLiveness;
 import com.k1af.rttyaf.rigs.DiscoveryTX500Rig;
 import com.k1af.rttyaf.rigs.ElecraftRig;
 import com.k1af.rttyaf.rigs.Flex6000Rig;

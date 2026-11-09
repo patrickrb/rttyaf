@@ -4,5 +4,8 @@ rttyaf/.gitignore 2
 .FT8CN软件设计初衷及使用说明0.88版.pdf.icloud
 rttyaf/app/src/main/assets/.nightUSGS4Layer.sqlite.icloud
 
+# Local Amp portal metadata (not needed by the Android host workflow).
+.amp/portals/
+
 # Per-contributor Claude Code notes (machine paths, device serials) - see CLAUDE.md
 CLAUDE.local.md

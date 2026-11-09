@@ -1,4 +1,4 @@
-package com.k1af.rttyaf.wave;
+package radio.core.usb;
 
 import static com.google.common.truth.Truth.assertThat;
 
