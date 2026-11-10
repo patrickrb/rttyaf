@@ -1,41 +1,38 @@
-import { Fragment, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   api,
   onEngineEvent,
   type AudioDevice,
   type BandInfo,
   type ClockSyncEvent,
-  type CycleTick,
   type EngineEvent,
   type HamlibRig,
   type QsoRecord,
   type RigConfig,
   type RigStatusEvent,
   type SerialPortInfo,
-  type TxStage,
+  type RttyConfig,
   type TxStateEvent,
-  type UiMessage,
   type WaterfallConfig,
   type WfWindow,
 } from "./ipc";
 
 type Tab = "decode" | "log" | "settings";
-type Filter = "all" | "cq" | "tome";
-const MAX_MESSAGES = 800;
+const DEFAULT_MODEM: RttyConfig = { baud_rate: 45.45, shift_hz: 170, mark_hz: 2125,
+  sample_rate: 12000, stop_bits: 1.5, reverse: false, unshift_on_space: true,
+  squelch: true, squelch_floor: 0.004 };
 
 // The live waterfall draws imperatively to a canvas (registered by WaterfallView)
 // so per-row spectrum events never go through React state.
 const WF_HEIGHT = 160;
 // Top of the displayed audio band; matches the backend's WF_MAX_HZ.
 const WF_TOP_HZ = 3500;
-const TX_MIN_HZ = 200;
-const TX_MAX_HZ = 2900;
 let wfCanvas: HTMLCanvasElement | null = null;
 function registerWfCanvas(c: HTMLCanvasElement | null) {
   wfCanvas = c;
   if (c) c.height = WF_HEIGHT;
 }
-function drawWaterfallRow(bins: number[], boundary = false) {
+function drawWaterfallRow(bins: number[]) {
   const cv = wfCanvas;
   if (!cv || bins.length === 0) return;
   const cols = bins.length;
@@ -54,31 +51,23 @@ function drawWaterfallRow(bins: number[], boundary = false) {
     img.data[i * 4 + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
-  // 15 s cycle grid line, on the same rx-corrected clock as decode DT: a faint
-  // overlay so the waterfall's timing reads against the cycle (and the DT)
-  // rather than appearing to run ahead of it.
-  if (boundary) {
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.fillRect(0, 0, cols, 1);
-  }
 }
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("decode");
-  const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [cycle, setCycle] = useState<CycleTick | null>(null);
+  const [received, setReceived] = useState("");
+  const [utcMs, setUtcMs] = useState<number | null>(null);
   const [txState, setTxState] = useState<TxStateEvent | null>(null);
   const [rig, setRig] = useState<RigStatusEvent | null>(null);
   const [clock, setClock] = useState<ClockSyncEvent | null>(null);
   const [decoding, setDecoding] = useState(false);
   const [audio, setAudio] = useState<{ db: number; silent: boolean } | null>(null);
   const [status, setStatus] = useState("");
-  const [filter, setFilter] = useState<Filter>("all");
-  const [txFreq, setTxFreq] = useState(1500);
+  const [modem, setModem] = useState<RttyConfig>(DEFAULT_MODEM);
   const [txGain, setTxGain] = useState(90); // TX level as a percentage (0–100)
   const [rigLabel, setRigLabel] = useState(""); // optional display-name override
   const [bands, setBands] = useState<BandInfo[]>([]);
-  const [dialHz, setDialHz] = useState<number>(14074000);
+  const [dialHz, setDialHz] = useState<number>(14085000);
 
   // keep latest decoding flag for the toggle without stale closure
   const decodingRef = useRef(decoding);
@@ -104,9 +93,6 @@ export default function App() {
     api.getConfig("dial_hz").then((v) => {
       if (v) setDialHz(parseInt(v, 10));
     });
-    api.getConfig("base_freq").then((v) => {
-      if (v) setTxFreq(parseInt(v, 10));
-    });
     api.getConfig("tx_gain").then((v) => {
       if (v == null || v === "") return;
       const pct = Math.round(parseFloat(v) * 100);
@@ -123,38 +109,34 @@ export default function App() {
 
   function handleEvent(e: EngineEvent) {
     switch (e.type) {
-      case "decoded":
-        if (e.data.length) {
-          setMessages((prev) => {
-            // Safety net: drop any incoming message already present for the same
-            // slot (same utc_ms + text), so a stray duplicate event can't double rows.
-            const seen = new Set(prev.map((m) => `${m.utc_ms}|${m.text}`));
-            const fresh = e.data.filter((m) => !seen.has(`${m.utc_ms}|${m.text}`));
-            if (fresh.length === 0) return prev;
-            return [...fresh, ...prev].slice(0, MAX_MESSAGES);
-          });
-        }
+      case "received":
+        setReceived((prev) => (prev + e.data).slice(-32000));
         break;
-      case "cycle":
-        setCycle(e.data);
+      case "clock":
+        setUtcMs(e.data);
+        break;
+      case "modem":
+        setModem(e.data);
+        break;
+      case "decoding":
+        setDecoding(e.data);
+        if (!e.data) setAudio(null);
         break;
       case "tx_state":
         setTxState(e.data);
         break;
       case "rig_status":
         setRig(e.data);
+        setDialHz(e.data.frequency_hz);
         break;
       case "clock_sync":
         setClock(e.data);
         break;
       case "waterfall_row":
-        drawWaterfallRow(e.data.bins, e.data.boundary);
+        drawWaterfallRow(e.data.bins);
         break;
       case "input_level":
         setAudio(e.data);
-        break;
-      case "qso_completed":
-        setStatus(`QSO logged: ${e.data.call} ${e.data.rst_sent}/${e.data.rst_rcvd}`);
         break;
       case "info":
         setStatus(e.data);
@@ -168,11 +150,8 @@ export default function App() {
   function toggleDecode() {
     if (decodingRef.current) {
       api.stopDecode();
-      setDecoding(false);
-      setAudio(null); // no input meter while stopped
     } else {
       api.startDecode();
-      setDecoding(true);
     }
   }
 
@@ -181,14 +160,10 @@ export default function App() {
     api.setBand(hz);
   }
 
-  const visible = messages.filter((m) =>
-    filter === "all" ? true : filter === "cq" ? m.is_cq : m.to_me
-  );
-
   return (
     <>
       <TopBar
-        cycle={cycle}
+        utcMs={utcMs}
         decoding={decoding}
         onToggleDecode={toggleDecode}
         bands={bands}
@@ -214,18 +189,13 @@ export default function App() {
       <div className={"content" + (tab === "decode" ? " decode" : "")}>
         {tab === "decode" && (
           <DecodeScreen
-            messages={visible}
-            filter={filter}
-            setFilter={setFilter}
-            txFreq={txFreq}
-            onSelectFreq={(hz) => {
-              setTxFreq(hz);
-              api.setBaseFreq(hz);
-            }}
-            onAnswer={(m) => api.answer({ call_from: m.call_from, grid: m.grid, snr: m.snr })}
+            received={received}
+            onClear={() => setReceived("")}
+            modem={modem}
+            onModem={(next) => { setModem(next); api.setModem(next); }}
           />
         )}
-        {tab === "log" && <LogScreen />}
+        {tab === "log" && <LogScreen dialHz={dialHz} utcMs={utcMs} bands={bands} />}
         {tab === "settings" && (
           <SettingsScreen
             onStatus={setStatus}
@@ -240,8 +210,6 @@ export default function App() {
       <TxBar
         txState={txState}
         decoding={decoding}
-        onCq={() => api.startCq()}
-        onStage={(s) => api.setStage(s)}
         onStop={() => api.stopTx()}
       />
       <div className="status-line">{status}</div>
@@ -250,7 +218,7 @@ export default function App() {
 }
 
 function TopBar(props: {
-  cycle: CycleTick | null;
+  utcMs: number | null;
   decoding: boolean;
   onToggleDecode: () => void;
   bands: BandInfo[];
@@ -263,18 +231,14 @@ function TopBar(props: {
   txGain: number;
   onTxGain: (v: number) => void;
 }) {
-  const { cycle, decoding, onToggleDecode, bands, dialHz, onBand, rig, clock, audio, rigLabel, txGain, onTxGain } = props;
-  const utc = cycle ? new Date(cycle.utc_ms).toISOString().substring(11, 19) : "--:--:--";
-  const pct = cycle ? (cycle.ms_into_cycle / 15000) * 100 : 0;
+  const { utcMs, decoding, onToggleDecode, bands, dialHz, onBand, rig, clock, audio, rigLabel, txGain, onTxGain } = props;
+  const utc = utcMs ? new Date(utcMs).toISOString().substring(11, 19) : "--:--:--";
   return (
     <div className="topbar">
-      <span className="brand">FT8AF</span>
+      <span className="brand">RTTYAF</span>
       <span className="clock">{utc}</span>
       <ClockSyncBadge clock={clock} />
-      <div className="cycle-bar">
-        <div style={{ width: `${pct}%` }} />
-      </div>
-      <span className="seq">seq {cycle?.sequential ?? "-"}</span>
+      <span className="muted">Continuous Baudot · internal testing</span>
       <div className="spacer" />
       <span className="tx-level" title="TX output level (drive) — lower until ALC stops pinning">
         <span className="muted">TX</span>
@@ -293,12 +257,15 @@ function TopBar(props: {
         </span>
       </span>
       <select value={dialHz} onChange={(e) => onBand(parseInt(e.target.value, 10))}>
+        {!bands.some((b) => b.dial_hz === dialHz) && <option value={dialHz}>Custom · {(dialHz / 1e6).toFixed(6)}</option>}
         {bands.map((b) => (
           <option key={b.name} value={b.dial_hz}>
             {b.name} · {(b.dial_hz / 1e6).toFixed(3)}
           </option>
         ))}
       </select>
+      <input aria-label="Dial frequency Hz" type="number" min={1} step={100} value={dialHz}
+        style={{ width: 110 }} onChange={(e) => { const hz = Number(e.target.value); if (hz > 0) onBand(hz); }} />
       <span className="muted">
         {rig?.connected ? `rig: ${rigLabel || rig.model}` : "no rig"}
         {rig?.ptt ? " · PTT" : ""}
@@ -352,19 +319,15 @@ function fmtOffset(ms: number): string {
   return `${s >= 0 ? "+" : ""}${s.toFixed(2)}s`;
 }
 
-// Small clock-health indicator next to the UTC clock. Green when the offset is
-// tight enough for clean FT8 (<0.5 s), amber when it's getting risky, grey until
-// the first sync lands.
+// Clock sync affects log timestamps only; asynchronous RTTY has no UTC slots.
 function ClockSyncBadge({ clock }: { clock: ClockSyncEvent | null }) {
   if (!clock || !clock.synced) {
     return <span className="muted" title="Waiting for NTP time sync">sync …</span>;
   }
-  const mag = Math.abs(clock.offset_ms);
-  const color = mag < 500 ? "var(--ok)" : mag < 1500 ? "var(--tome)" : "var(--tx)";
   return (
     <span
-      style={{ color, fontVariantNumeric: "tabular-nums" }}
-      title={`Clock offset from NTP: ${clock.offset_ms} ms (applied to decode timing, system clock untouched)`}
+      className="muted"
+      title={`Log clock offset from NTP: ${clock.offset_ms} ms; RTTY does not require slot synchronization`}
     >
       sync {fmtOffset(clock.offset_ms)}
     </span>
@@ -372,10 +335,10 @@ function ClockSyncBadge({ clock }: { clock: ClockSyncEvent | null }) {
 }
 
 function WaterfallView({
-  txFreq,
+  modem,
   onSelectFreq,
 }: {
-  txFreq: number;
+  modem: RttyConfig;
   onSelectFreq: (hz: number) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -388,16 +351,19 @@ function WaterfallView({
     const rect = e.currentTarget.getBoundingClientRect();
     const frac = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     const hz = Math.round(frac * WF_TOP_HZ);
-    onSelectFreq(Math.min(TX_MAX_HZ, Math.max(TX_MIN_HZ, hz)));
+    onSelectFreq(Math.min(3000 - modem.shift_hz, Math.max(500, hz)));
   }
 
-  const leftPct = (txFreq / WF_TOP_HZ) * 100;
+  const mark = modem.mark_hz + (modem.reverse ? modem.shift_hz : 0);
+  const space = modem.mark_hz + (modem.reverse ? 0 : modem.shift_hz);
+  const leftPct = (modem.mark_hz / WF_TOP_HZ) * 100;
 
   return (
     <div
+      className="waterfall"
       style={{ position: "relative", marginBottom: 8, cursor: "crosshair" }}
       onClick={handleClick}
-      title="Click to set TX frequency"
+      title="Click to tune the RX/TX tone pair (lower audio tone)"
     >
       <canvas
         ref={ref}
@@ -410,13 +376,15 @@ function WaterfallView({
           display: "block",
         }}
       />
-      {/* TX frequency marker */}
+      {/* MARK and SPACE remain distinct when polarity is reversed. */}
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${space / WF_TOP_HZ * 100}%`,
+        width: 2, background: "#4ea1ff", pointerEvents: "none" }} />
       <div
         style={{
           position: "absolute",
           top: 0,
           bottom: 0,
-          left: `${leftPct}%`,
+          left: `${mark / WF_TOP_HZ * 100}%`,
           width: 2,
           background: "#ff3b30",
           pointerEvents: "none",
@@ -426,7 +394,9 @@ function WaterfallView({
         style={{
           position: "absolute",
           top: 2,
-          left: `calc(${leftPct}% + 4px)`,
+          left: `clamp(4px, calc(${leftPct}% + 4px), calc(100% - 170px))`,
+          background: "rgba(0,0,0,0.85)",
+          padding: "2px 4px",
           color: "#ff8f87",
           fontSize: 11,
           fontVariantNumeric: "tabular-nums",
@@ -434,7 +404,7 @@ function WaterfallView({
           textShadow: "0 0 3px #000",
         }}
       >
-        TX {txFreq} Hz
+        M {mark} / S {space} Hz
       </div>
     </div>
   );
@@ -450,82 +420,47 @@ function colormap(v: number): [number, number, number] {
 }
 
 function DecodeScreen(props: {
-  messages: UiMessage[];
-  filter: Filter;
-  setFilter: (f: Filter) => void;
-  txFreq: number;
-  onSelectFreq: (hz: number) => void;
-  onAnswer: (m: UiMessage) => void;
+  received: string;
+  onClear: () => void;
+  modem: RttyConfig;
+  onModem: (config: RttyConfig) => void;
 }) {
-  const { messages, filter, setFilter, txFreq, onSelectFreq, onAnswer } = props;
+  const { received, onClear, modem, onModem } = props;
+  const rx = useRef<HTMLPreElement>(null);
+  useEffect(() => { if (rx.current) rx.current.scrollTop = rx.current.scrollHeight; }, [received]);
   return (
     <>
-      <WaterfallView txFreq={txFreq} onSelectFreq={onSelectFreq} />
-      <div className="chips">
-        {(["all", "cq", "tome"] as Filter[]).map((f) => (
-          <div key={f} className={"chip" + (filter === f ? " active" : "")} onClick={() => setFilter(f)}>
-            {f === "all" ? "All" : f === "cq" ? "CQ" : "To me"}
-          </div>
-        ))}
+      <WaterfallView modem={modem} onSelectFreq={(mark_hz) => onModem({ ...modem, mark_hz })} />
+      <div className="row modem-controls">
+        <label>Baud <select aria-label="RTTY baud" value={modem.baud_rate} onChange={(e) => onModem({ ...modem, baud_rate: Number(e.target.value) })}>
+          {[45.45, 50, 75].map((n) => <option key={n}>{n}</option>)}
+        </select></label>
+        <label>Shift <select aria-label="RTTY shift Hz" value={modem.shift_hz} onChange={(e) => {
+          const shift_hz = Number(e.target.value); onModem({ ...modem, shift_hz, mark_hz: Math.min(modem.mark_hz, 3000 - shift_hz) });
+        }}>{[170, 200, 425, 850].map((n) => <option key={n}>{n}</option>)}</select> Hz</label>
+        <label>Lower tone <input aria-label="Lower tone Hz" type="number" min={500} max={3000 - modem.shift_hz} value={modem.mark_hz}
+          onChange={(e) => { const mark_hz = Number(e.target.value); if (mark_hz >= 500 && mark_hz + modem.shift_hz <= 3000) onModem({ ...modem, mark_hz }); }} /> Hz</label>
+        <label>Stop <select aria-label="Stop bits" value={modem.stop_bits} onChange={(e) => onModem({ ...modem, stop_bits: Number(e.target.value) })}>
+          {[1, 1.5, 2].map((n) => <option key={n}>{n}</option>)}
+        </select></label>
+        <label><input type="checkbox" checked={modem.reverse} onChange={(e) => onModem({ ...modem, reverse: e.target.checked })} /> Reverse (USB)</label>
+        <label><input type="checkbox" checked={modem.unshift_on_space} onChange={(e) => onModem({ ...modem, unshift_on_space: e.target.checked })} /> USOS</label>
+        <label><input type="checkbox" checked={modem.squelch} onChange={(e) => onModem({ ...modem, squelch: e.target.checked })} /> Squelch</label>
+        <button onClick={onClear}>Clear RX</button>
       </div>
-      <div className="decode-list">
-      <table>
-        <thead>
-          <tr>
-            <th>UTC</th>
-            <th>dB</th>
-            <th>DT</th>
-            <th>Hz</th>
-            <th>Message</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {messages.map((m, i) => {
-            const newBlock = i > 0 && messages[i - 1].utc_ms !== m.utc_ms;
-            return (
-              <Fragment key={i}>
-                {newBlock && (
-                  <tr className="time-sep">
-                    <td colSpan={6}>{new Date(m.utc_ms).toISOString().substring(11, 19)} UTC</td>
-                  </tr>
-                )}
-                <tr
-                  className={
-                    (m.is_cq ? "cq " : "") +
-                    (m.to_me ? "tome " : "") +
-                    (m.is_cq || m.to_me ? "clickable" : "")
-                  }
-                  onClick={() => (m.is_cq || m.to_me) && onAnswer(m)}
-                  title={m.is_cq || m.to_me ? "Click to answer" : ""}
-                >
-                  <td>{new Date(m.utc_ms).toISOString().substring(11, 19)}</td>
-                  <td>{m.snr}</td>
-                  <td>{m.time_sec.toFixed(1)}</td>
-                  <td>{Math.round(m.freq_hz)}</td>
-                  <td>{m.text}</td>
-                  <td>{m.is_cq || m.to_me ? "↩ answer" : ""}</td>
-                </tr>
-              </Fragment>
-            );
-          })}
-          {messages.length === 0 && (
-            <tr>
-              <td colSpan={6} className="muted">
-                No decodes yet — set your callsign in Settings, pick an audio input, and Start decode.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-      </div>
+      <p className="muted">Set the rig to LSB, or USB with Reverse. Check local band permissions. Manual overs only; changing tones or dial stops TX.</p>
+      <pre className="rx-text" ref={rx} aria-label="Received RTTY text">{received || "Choose an audio input in Settings, then Start decode. Text streams here continuously."}</pre>
     </>
   );
 }
 
-function LogScreen() {
+function LogScreen({ dialHz, utcMs, bands }: { dialHz: number; utcMs: number | null; bands: BandInfo[] }) {
   const [rows, setRows] = useState<QsoRecord[]>([]);
   const [count, setCount] = useState(0);
+  const [call, setCall] = useState("");
+  const [sent, setSent] = useState("599");
+  const [rcvd, setRcvd] = useState("599");
+  const [logStatus, setLogStatus] = useState("");
 
   function refresh() {
     api.listLog(500, 0).then(setRows);
@@ -539,7 +474,7 @@ function LogScreen() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "ft8af_log.adi";
+    a.download = "rttyaf_log.adi";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -552,6 +487,26 @@ function LogScreen() {
 
   return (
     <>
+      <form className="row modem-controls panel" onSubmit={async (e) => {
+        e.preventDefault();
+        const now = new Date(utcMs ?? Date.now()).toISOString();
+        const date = now.slice(0, 10).replace(/-/g, "");
+        const time = now.slice(11, 19).replace(/:/g, "");
+        const config = Object.fromEntries(await api.allConfig());
+        try {
+          await api.saveQso({ call: call.trim().toUpperCase(), gridsquare: "", mode: "RTTY",
+            rst_sent: sent, rst_rcvd: rcvd, qso_date: date, time_on: time,
+            qso_date_off: date, time_off: time, band: bands.find((b) => dialHz >= b.lo_hz && dialHz <= b.hi_hz)?.name ?? "", freq: (dialHz / 1e6).toFixed(6),
+            station_callsign: config.my_call ?? "", my_gridsquare: config.my_grid ?? "", comment: "" });
+          setLogStatus(`Logged ${call.toUpperCase()} · RTTY`); setCall(""); refresh();
+        } catch (error) { setLogStatus(String(error)); }
+      }}>
+        <label>Call <input aria-label="Contact callsign" required value={call} onChange={(e) => setCall(e.target.value.toUpperCase())} /></label>
+        <label>RST sent <input aria-label="RST sent" required value={sent} onChange={(e) => setSent(e.target.value)} /></label>
+        <label>RST received <input aria-label="RST received" required value={rcvd} onChange={(e) => setRcvd(e.target.value)} /></label>
+        <button className="primary" type="submit">Log RTTY QSO now</button>
+        <span role="status">{logStatus}</span>
+      </form>
       <div className="row" style={{ marginBottom: 10 }}>
         <strong>{count}</strong> <span className="muted">QSOs</span>
         <div className="spacer" style={{ flex: 1 }} />
@@ -627,7 +582,6 @@ function SettingsScreen(props: {
   const [hamlibRigs, setHamlibRigs] = useState<HamlibRig[]>([]);
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
-  const [baseFreq, setBaseFreq] = useState(1500);
   // Live-waterfall FFT developer knobs (issue #428). Defaults mirror
   // WfConfig::default() on the Rust side: hann / 2048 / 6.
   const [wfCfg, setWfCfg] = useState<WaterfallConfig>({
@@ -658,7 +612,6 @@ function SettingsScreen(props: {
     api.getConfig("my_grid").then((v) => v && setGrid(v));
     api.getConfig("input_device").then((v) => v && setInput(v));
     api.getConfig("output_device").then((v) => v && setOutput(v));
-    api.getConfig("base_freq").then((v) => v && setBaseFreq(parseInt(v, 10)));
     api.getConfig("rig_config").then((v) => {
       if (v) {
         try {
@@ -734,8 +687,8 @@ function SettingsScreen(props: {
         <h3>Time sync</h3>
         <div className="col">
           <div className="muted">
-            FT8 needs the clock within ~1 s of UTC. The app syncs to NTP on its own —
-            no external time software, and your system clock is left untouched.
+            RTTY is asynchronous: there are no UTC slots or DT calibration.
+            NTP corrects the app's log clock only; the system clock is untouched.
           </div>
           <div className="field">
             <label>Clock offset from UTC</label>
@@ -743,16 +696,6 @@ function SettingsScreen(props: {
               {clock?.synced
                 ? `${fmtOffset(clock.offset_ms)} (${clock.offset_ms} ms)`
                 : "waiting for first sync…"}
-            </div>
-          </div>
-          <div className="field">
-            <label>DT auto-calibration (audio latency)</label>
-            <div>
-              {clock ? `${fmtOffset(clock.rx_offset_ms)} (${clock.rx_offset_ms} ms)` : "—"}
-              <span className="muted" style={{ display: "block", marginTop: 4 }}>
-                Auto-tuned from decoded DT to keep the RX window aligned with your
-                soundcard/SDR latency. Self-corrects over a few cycles.
-              </span>
             </div>
           </div>
           <button
@@ -803,21 +746,7 @@ function SettingsScreen(props: {
               ))}
             </select>
           </div>
-          <div className="field">
-            <label>TX audio offset: {baseFreq} Hz</label>
-            <input
-              type="range"
-              min={200}
-              max={2800}
-              step={1}
-              value={baseFreq}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
-                setBaseFreq(v);
-                api.setBaseFreq(v);
-              }}
-            />
-          </div>
+          <p className="muted">RX and TX share the RTTY tone pair on the Decode tab. With no CAT/PTT backend, keying is manual/VOX.</p>
         </div>
       </div>
 
@@ -1123,51 +1052,29 @@ function SettingsScreen(props: {
   );
 }
 
-// The operator-selectable QSO messages, in WSJT-X Tx1–Tx5 order. Each rebuilds
-// the outgoing message from the current target/report on the backend.
-const TX_STAGES: { stage: TxStage; label: string; title: string }[] = [
-  { stage: "grid", label: "Grid", title: "Tx1 — send my grid" },
-  { stage: "report", label: "Rpt", title: "Tx2 — send signal report" },
-  { stage: "r_report", label: "R+Rpt", title: "Tx3 — send R + report" },
-  { stage: "rr73", label: "RR73", title: "Tx4 — send RR73" },
-  { stage: "bye73", label: "73", title: "Tx5 — send 73" },
-];
-
 function TxBar(props: {
   txState: TxStateEvent | null;
   decoding: boolean;
-  onCq: () => void;
-  onStage: (s: TxStage) => void;
   onStop: () => void;
 }) {
-  const { txState, decoding, onCq, onStage, onStop } = props;
+  const { txState, decoding, onStop } = props;
+  const [text, setText] = useState("");
   const tx = txState?.transmitting;
-  const stage = txState?.status.stage ?? "idle";
-  const target = txState?.status.target ?? null;
-  // Outside a QSO the auto-sequencer stage is "idle", which reads as "nothing
-  // happening" even while we're decoding — show the receiver's real activity then.
-  const stageLabel = stage === "idle" ? (decoding ? "listening" : "stopped") : stage;
   return (
     <div className="txbar">
       <span className={"badge " + (tx ? "tx" : "rx")}>{tx ? "TX" : "RX"}</span>
-      <span className="muted">stage: {stageLabel}</span>
-      {target && <span className="muted">→ {target}</span>}
-      <span className="msg">{txState?.message ?? ""}</span>
-      <div className="spacer" style={{ flex: 1 }} />
-      <div className="stage-picker" title={target ? "" : "Pick a station first"}>
-        {TX_STAGES.map((s) => (
-          <button
-            key={s.stage}
-            className={stage === s.stage ? "active" : ""}
-            disabled={!target}
-            title={s.title}
-            onClick={() => onStage(s.stage)}
-          >
-            {s.label}
-          </button>
-        ))}
+      <div className="col" style={{ flex: 1 }}>
+        <span className="muted">{tx ? "Sending one over" : decoding ? "Listening · manual TX" : "Receiver stopped · manual TX"}</span>
+        <textarea aria-label="Transmit RTTY text" maxLength={1000} rows={2} disabled={tx}
+          value={text} onChange={(e) => setText(e.target.value)} placeholder="Type an RTTY over, then Send once. Unsupported characters are skipped." />
+        {tx && <span className="msg">{txState?.message}</span>}
       </div>
-      <button className="primary" onClick={onCq}>Call CQ</button>
+      <button disabled={tx} onClick={async () => {
+        const call = await api.getConfig("my_call");
+        if (call) setText(`CQ CQ DE ${call} ${call} K`);
+        else window.alert("Set your callsign in Settings first");
+      }}>Prepare CQ</button>
+      <button className="primary" disabled={tx || !text.trim()} onClick={() => api.freeText(text)}>Send once</button>
       <button className="danger" onClick={onStop}>Stop TX</button>
     </div>
   );

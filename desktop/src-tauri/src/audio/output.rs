@@ -1,4 +1,4 @@
-//! TX audio playback: render a 12 kHz mono FT8 waveform to an output device,
+//! TX audio playback: render a 12 kHz mono RTTY waveform to an output device,
 //! resampling to the device rate and fanning the mono sample across channels.
 //!
 //! Playback is split into two phases so the engine can key the rig with minimal

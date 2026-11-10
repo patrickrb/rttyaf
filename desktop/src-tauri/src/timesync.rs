@@ -1,12 +1,5 @@
-//! Built-in SNTP time sync. FT8 lives or dies by sub-second clock accuracy: if
-//! the PC clock is off, every decode shows a large DT and your own transmissions
-//! land outside the window. Rather than make the user install Meinberg / Dimension 4
-//! / "set time automatically", we query an NTP server ourselves and feed the
-//! offset into the engine's `clock_offset_ms` — correcting the app's notion of UTC
-//! WITHOUT touching the system clock (so no admin rights, no background service).
-//!
-//! This is SNTP (RFC 4330): one request/response, no filtering or dispersion
-//! tracking — plenty for keeping DT inside ±0.1 s.
+//! SNTP correction for the logbook's UTC timestamps without changing the system
+//! clock. Asynchronous RTTY reception and manual TX do not use this clock.
 
 use std::net::{ToSocketAddrs, UdpSocket};
 use std::sync::mpsc::Sender;
@@ -92,7 +85,7 @@ fn ntp_ts_to_unix_ms(b: &[u8]) -> i64 {
 /// retry back-off while offline). Pushes results into the engine via `SetClockOffset`.
 pub fn spawn_loop(tx: Sender<EngineCommand>) {
     std::thread::Builder::new()
-        .name("ft8af-timesync".into())
+        .name("rttyaf-timesync".into())
         .spawn(move || loop {
             match query_offset_ms_multi() {
                 Ok(off) => {
@@ -110,7 +103,7 @@ pub fn spawn_loop(tx: Sender<EngineCommand>) {
 /// Fire a one-shot sync (for a manual "Resync" button) without blocking the caller.
 pub fn spawn_once(tx: Sender<EngineCommand>) {
     std::thread::Builder::new()
-        .name("ft8af-timesync-once".into())
+        .name("rttyaf-timesync-once".into())
         .spawn(move || {
             if let Ok(off) = query_offset_ms_multi() {
                 let _ = tx.send(EngineCommand::SetClockOffset(off));

@@ -1,12 +1,12 @@
 [package]
-name = "ft8af"
+name = "rttyaf"
 version = "0.1.0"
 edition = "2021"
-description = "FT8AF desktop — FT8 transceiver client"
+description = "RTTYAF desktop — Baudot RTTY transceiver client"
 license = "GPL-3.0-or-later"
 
 [lib]
-name = "ft8af"
+name = "rttyaf"
 path = "src/lib.rs"
 
 [dependencies]
@@ -34,12 +34,9 @@ ureq = { version = "2", default-features = false }
 libloading = "0.8"
 # persistence (bundled SQLite — no system dependency)
 rusqlite = { version = "0.32", features = ["bundled"] }
-# async runtime for the UTC scheduler
+# async runtime for rig/network helpers
 tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
 
-# The C FT8 DSP core (kgoba ft8_lib @ 6f528128 + ft8af_glue/gfsk.c) is compiled
-# from source in build.rs via the `cc` crate — no prebuilt .so, so this links
-# natively on Windows/macOS/Linux.
+# The RTTY modem is pure Rust. Only Tauri context/resources need a build step.
 [build-dependencies]
-cc = "1"
 tauri-build = { version = "2", features = [] }

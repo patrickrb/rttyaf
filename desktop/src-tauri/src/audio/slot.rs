@@ -1,95 +1,64 @@
-//! Rolling buffer of 12 kHz mono samples, the desktop equivalent of
-//! `HamRecorder.VoiceDataMonitor`: capture runs continuously and the scheduler
-//! copies the most recent 15 s slot at each UTC boundary.
-
+//! Bounded continuous capture: decode each sample once, retain recent spectrum
+//! history separately. Overflow is reported so the framer can discard lost state.
+use crate::dsp::SAMPLE_RATE;
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 
-use crate::dsp::{SAMPLE_RATE, SLOT_SAMPLES};
-
-pub struct SlotAccumulator {
-    inner: Mutex<VecDeque<f32>>,
-    cap: usize,
+const CAPACITY: usize = SAMPLE_RATE as usize * 2;
+struct Buffers {
+    pending: VecDeque<f32>,
+    recent: VecDeque<f32>,
+    overflow: bool,
+}
+pub struct CaptureBuffer {
+    inner: Mutex<Buffers>,
 }
 
-impl SlotAccumulator {
+impl CaptureBuffer {
     pub fn new() -> Self {
-        // Hold a little over one slot so a boundary copy always has a full slot.
-        let cap = SLOT_SAMPLES + SAMPLE_RATE as usize; // ~16 s
-        SlotAccumulator {
-            inner: Mutex::new(VecDeque::with_capacity(cap)),
-            cap,
+        Self {
+            inner: Mutex::new(Buffers {
+                pending: VecDeque::new(),
+                recent: VecDeque::new(),
+                overflow: false,
+            }),
         }
     }
-
-    /// Append freshly captured 12 kHz samples, evicting the oldest beyond `cap`.
     pub fn push(&self, samples: &[f32]) {
-        let mut buf = self.inner.lock();
-        buf.extend(samples.iter().copied());
-        while buf.len() > self.cap {
-            buf.pop_front();
+        let mut b = self.inner.lock();
+        for &sample in samples {
+            if b.pending.len() == CAPACITY {
+                b.pending.pop_front();
+                b.overflow = true;
+            }
+            b.pending.push_back(sample);
+            if b.recent.len() == CAPACITY {
+                b.recent.pop_front();
+            }
+            b.recent.push_back(sample);
         }
     }
-
-    /// Copy the most recent full slot (`SLOT_SAMPLES`), front-padding with silence
-    /// if fewer samples have been captured so far.
-    pub fn take_slot(&self) -> Vec<f32> {
-        let buf = self.inner.lock();
-        let mut out = vec![0.0f32; SLOT_SAMPLES];
-        let n = buf.len().min(SLOT_SAMPLES);
-        // most recent n samples land at the end of `out`
-        let start_dst = SLOT_SAMPLES - n;
-        for (i, s) in buf.iter().skip(buf.len() - n).enumerate() {
-            out[start_dst + i] = *s;
-        }
-        out
+    pub fn drain(&self) -> (Vec<f32>, bool) {
+        let mut b = self.inner.lock();
+        let overflow = std::mem::take(&mut b.overflow);
+        (b.pending.drain(..).collect(), overflow)
     }
-
-    /// Copy a slot aligned to the slot *start*: the most recent `elapsed_samples`
-    /// captured samples (the audio belonging to the current slot so far) placed at
-    /// the FRONT of a `SLOT_SAMPLES` buffer, zero-padding the tail. The FT8
-    /// waveform begins at the slot boundary, so it lands at sample 0 — the
-    /// alignment the decoder expects (DT measured from the buffer start). This lets
-    /// the decoder run as soon as the 12.64 s waveform is captured (~13 s into the
-    /// cycle) instead of waiting for the full 15 s boundary, pulling decodes — and
-    /// the operator's reply — a slot earlier (matches WSJT-X).
-    ///
-    /// At `elapsed_samples >= SLOT_SAMPLES` (a full slot) this matches `take_slot`:
-    /// the most recent 15 s with the signal at the front.
-    pub fn take_slot_from_start(&self, elapsed_samples: usize) -> Vec<f32> {
-        let buf = self.inner.lock();
-        let mut out = vec![0.0f32; SLOT_SAMPLES];
-        let n = elapsed_samples.min(buf.len()).min(SLOT_SAMPLES);
-        // The oldest of these n samples is the slot-start sample → position 0.
-        for (i, s) in buf.iter().skip(buf.len() - n).enumerate() {
-            out[i] = *s;
-        }
-        out
-    }
-
-    /// Copy the most recent `n` samples (for the live waterfall FFT) without
-    /// disturbing the buffer. Returns fewer than `n` only during warm-up.
     pub fn peek_recent(&self, n: usize) -> Vec<f32> {
-        let buf = self.inner.lock();
-        let len = buf.len();
-        let take = n.min(len);
-        buf.iter().skip(len - take).copied().collect()
+        let b = self.inner.lock();
+        b.recent
+            .iter()
+            .skip(b.recent.len().saturating_sub(n))
+            .copied()
+            .collect()
     }
-
-    pub fn len(&self) -> usize {
-        self.inner.lock().len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.inner.lock().is_empty()
-    }
-
     pub fn clear(&self) {
-        self.inner.lock().clear();
+        let mut b = self.inner.lock();
+        b.pending.clear();
+        b.recent.clear();
+        b.overflow = false;
     }
 }
-
-impl Default for SlotAccumulator {
+impl Default for CaptureBuffer {
     fn default() -> Self {
         Self::new()
     }
@@ -98,35 +67,27 @@ impl Default for SlotAccumulator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
-    fn take_slot_from_start_front_aligns_partial_slot() {
-        let acc = SlotAccumulator::new();
-        // Simulate ~13 s of a slot: a 1.0 marker at the slot start, then a ramp.
-        let elapsed = SAMPLE_RATE as usize * 13;
-        let mut audio = vec![0.0f32; elapsed];
-        audio[0] = 1.0; // slot-start sample
-        audio[elapsed - 1] = 0.5; // most-recent sample
-        acc.push(&audio);
-
-        let slot = acc.take_slot_from_start(elapsed);
-        assert_eq!(slot.len(), SLOT_SAMPLES);
-        // Slot-start sample lands at index 0 (DT == 0 for the decoder).
-        assert_eq!(slot[0], 1.0);
-        // Most-recent captured sample lands at index elapsed-1, not at the end.
-        assert_eq!(slot[elapsed - 1], 0.5);
-        // The tail (after captured audio) is zero-padded, never noise.
-        assert!(slot[elapsed..].iter().all(|&s| s == 0.0));
+    fn continuous_capture_has_no_duplicates_and_keeps_spectrum_history() {
+        let buffer = CaptureBuffer::new();
+        buffer.push(&[1.0, 2.0, 3.0]);
+        assert_eq!(buffer.drain(), (vec![1.0, 2.0, 3.0], false));
+        buffer.push(&[4.0]);
+        assert_eq!(buffer.drain(), (vec![4.0], false));
+        assert_eq!(buffer.drain(), (vec![], false));
+        assert_eq!(buffer.peek_recent(3), [2.0, 3.0, 4.0]);
+        buffer.clear();
+        assert!(buffer.peek_recent(10).is_empty());
     }
-
     #[test]
-    fn take_slot_from_start_full_slot_matches_take_slot() {
-        let acc = SlotAccumulator::new();
-        let audio: Vec<f32> = (0..SLOT_SAMPLES).map(|i| (i % 7) as f32).collect();
-        acc.push(&audio);
-        // A full slot's worth of elapsed samples reproduces the boundary copy.
-        assert_eq!(acc.take_slot_from_start(SLOT_SAMPLES), acc.take_slot());
-        // Asking for more than a slot is clamped, not an overrun.
-        assert_eq!(acc.take_slot_from_start(SLOT_SAMPLES * 2), acc.take_slot());
+    fn overrun_is_bounded_and_reported_once() {
+        let buffer = CaptureBuffer::new();
+        let samples: Vec<_> = (0..CAPACITY + 9).map(|n| n as f32).collect();
+        buffer.push(&samples);
+        let (pending, lost) = buffer.drain();
+        assert!(lost);
+        assert_eq!(pending, samples[9..]);
+        assert_eq!(buffer.peek_recent(CAPACITY * 2), samples[9..]);
+        assert_eq!(buffer.drain(), (vec![], false));
     }
 }

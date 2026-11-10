@@ -4,42 +4,21 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-export interface UiMessage {
-  utc_ms: number;
-  call_to: string;
-  call_from: string;
-  extra: string;
-  grid: string;
-  snr: number;
-  freq_hz: number;
-  time_sec: number;
-  text: string;
-  is_cq: boolean;
-  to_me: boolean;
-}
-
-export interface CycleTick {
-  utc_ms: number;
-  sequential: number;
-  ms_into_cycle: number;
-}
-
-export type TxStage =
-  | "idle" | "cq" | "grid" | "report" | "r_report" | "rr73" | "bye73";
-
-export interface QsoStatus {
-  active: boolean;
-  stage: TxStage;
-  target: string | null;
-  tx_message: string | null;
-  report_sent: number | null;
-  report_rcvd: number | null;
+export interface RttyConfig {
+  baud_rate: number;
+  shift_hz: number;
+  mark_hz: number;
+  sample_rate: number;
+  stop_bits: number;
+  reverse: boolean;
+  unshift_on_space: boolean;
+  squelch: boolean;
+  squelch_floor: number;
 }
 
 export interface TxStateEvent {
   transmitting: boolean;
   message: string | null;
-  status: QsoStatus;
 }
 
 export interface RigStatusEvent {
@@ -54,8 +33,6 @@ export interface ClockSyncEvent {
   offset_ms: number;
   /** true once an NTP sync has succeeded (or a saved offset was restored). */
   synced: boolean;
-  /** auto-calibrated audio-capture latency compensation (ms) applied to the RX window. */
-  rx_offset_ms: number;
 }
 
 export interface QsoRecord {
@@ -97,6 +74,8 @@ export interface HamlibRig {
 export interface BandInfo {
   name: string;
   dial_hz: number;
+  lo_hz: number;
+  hi_hz: number;
 }
 
 /** Waterfall FFT window (developer setting, issue #428). */
@@ -128,14 +107,14 @@ export interface RigConfig {
 }
 
 export type EngineEvent =
-  | { type: "decoded"; data: UiMessage[] }
-  | { type: "cycle"; data: CycleTick }
+  | { type: "received"; data: string }
+  | { type: "clock"; data: number }
+  | { type: "modem"; data: RttyConfig }
+  | { type: "decoding"; data: boolean }
   | { type: "tx_state"; data: TxStateEvent }
   | { type: "rig_status"; data: RigStatusEvent }
   | { type: "clock_sync"; data: ClockSyncEvent }
-  | { type: "qso_completed"; data: QsoRecord }
-  | { type: "waterfall"; data: { bins: number[]; rows: number; cols: number; hz_per_col: number } }
-  | { type: "waterfall_row"; data: { bins: number[]; hz_per_col: number; boundary: boolean } }
+  | { type: "waterfall_row"; data: { bins: number[]; hz_per_col: number } }
   | { type: "input_level"; data: { db: number; silent: boolean } }
   | { type: "info"; data: string }
   | { type: "error"; data: string };
@@ -157,7 +136,7 @@ export const api = {
   stopDecode: () => invoke("stop_decode"),
   setStation: (call: string, grid: string) => invoke("set_station", { call, grid }),
   setBand: (dialHz: number) => invoke("set_band", { dialHz }),
-  setBaseFreq: (hz: number) => invoke("set_base_freq", { hz }),
+  setModem: (config: RttyConfig) => invoke("set_modem", { config }),
   setTxGain: (gain: number) => invoke("set_tx_gain", { gain }),
   setInputDevice: (name: string | null) => invoke("set_input_device", { name }),
   setOutputDevice: (name: string | null) => invoke("set_output_device", { name }),
@@ -166,10 +145,6 @@ export const api = {
   refreshStatus: () => invoke("refresh_status"),
   resyncTime: () => invoke("resync_time"),
 
-  startCq: () => invoke("start_cq"),
-  answer: (args: { call_from: string; grid: string; snr: number }) =>
-    invoke("answer", { args }),
-  setStage: (stage: TxStage) => invoke("set_stage", { stage }),
   stopTx: () => invoke("stop_tx"),
   freeText: (text: string) => invoke("free_text", { text }),
 

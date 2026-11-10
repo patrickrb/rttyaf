@@ -1,130 +1,97 @@
-# FT8AF Desktop
+# RTTYAF Desktop — internal testing
 
-A cross-platform (Windows / macOS / Linux) desktop port of the FT8AF Android app,
-built with **Tauri** (Rust backend + React/TypeScript frontend). It reuses the
-exact pure-C FT8 DSP core from the Android app (`ft8af/app/src/main/cpp`,
-kgoba `ft8_lib` @ `6f528128`) — compiled from source, no JNI.
+Cross-platform Tauri application (Rust + React/TypeScript) with a real US-TTY
+Baudot/ITA2 AFSK modem ported from Android's `rtty/` Kotlin implementation.
+There is no FT8 modem, native FT8 library, 15-second scheduling, automatic QSO
+sequencing, or automatic logging. Operators send one over at a time and log
+contacts manually.
 
-MVP scope: receive/decode FT8, transmit + auto-QSO sequencing, logbook with ADIF
-export, rig control (**Hamlib** embedded library, **FLrig** XML-RPC, or direct
-serial CAT — Yaesu / Kenwood / Icom CI-V), audio device selection, and a
-waterfall. Deferred: map, POTA, QRZ photos, Bluetooth, PSKReporter upload.
+## Modem and operation
 
-## Layout
+- Continuous quadrature MARK/SPACE detectors, Schmitt slicer, asynchronous
+  start-bit recovery, five data bits LSB-first, persistent LTRS/FIGS state,
+  optional unshift-on-space (USOS), and energy squelch.
+- Defaults match Android: 45.45 baud, 170 Hz shift, 2125/2295 Hz audio tones,
+  1.5 stop bits, 12 kHz mono audio, half-scale continuous-phase FSK.
+- UI provides 45.45/50/75 baud, 170/200/425/850 Hz shift, lower-tone tuning,
+  1/1.5/2 stop bits, reverse and USOS. Click the waterfall to move both tones.
+- Use **LSB** normally, or **USB + Reverse**. The app preserves the operator's
+  rig mode; it does not force the old FT8 USB/data mode. Suggested dial
+  frequencies are starting points, not permission to transmit. Check local
+  band rules and find a clear channel.
+- Select audio input/output and rig in Settings. Start decode for streaming
+  text; Prepare CQ only fills the editor. Send once starts immediately, with
+  no slot wait or leading-audio clipping. Unsupported characters are skipped.
+- Stop TX aborts playback before releasing PTT. Changing dial, modem, output
+  device or rig also stops TX. Failed PTT release retains the possibly keyed
+  state, blocks changing rigs, and can be retried with Stop TX. **If CAT fails,
+  check/unkey the radio manually.** Host tests cannot establish RF safety.
+- NTP corrects displayed/logbook UTC only; RTTY decoding and TX do not depend on
+  a synchronized clock. SQLite/ADIF use RTTY mode. Data is stored in the new
+  `RTTYAF/rttyaf.sqlite` app-data directory; old FT8AF data is not modified.
 
-```
-desktop/
-  src/              React + TypeScript frontend (Vite)
-    ipc.ts          typed command/event bridge to Rust
-    App.tsx         decode list, waterfall, logbook, settings, TX/QSO panel
-  src-tauri/        Rust backend
-    build.rs        compiles the C ft8_lib core (cc crate) + Tauri context
-    src/
-      dsp/          FFI to ft8_lib (decoder, encode, callsign hash table)
-      audio/        cpal capture/playback, 12 kHz resample, slot buffer
-      engine.rs     the runtime: 15 s UTC cycle, decode, QSO, TX/PTT, events
-      qso.rs        FT8 QSO auto-sequence state machine (pure, unit-tested)
-      rig.rs        rig control backends: Hamlib (dyn-loaded), FLrig XML-RPC, serial CAT
-      db.rs         SQLite (rusqlite) qso_log + config + ADIF export
-      bands.rs      FT8 band plan
-      main.rs       Tauri commands + event forwarding
-```
+## Build and test
 
-## Prerequisites
+Install Rust stable, Node 20+, and Tauri 2 platform prerequisites. Linux needs
+GTK3, WebKitGTK 4.1, ALSA and udev development libraries. Windows uses the MSVC
+toolchain. The modem itself needs **no C compiler or external DSP sources**;
+bundled SQLite/Tauri still have their normal platform build dependencies.
 
-- **Rust** (stable, MSVC toolchain on Windows): `winget install Rustlang.Rustup`
-- **Node.js 18+** and npm
-- **Windows only:** the C core uses C99 VLAs that MSVC's `cl.exe` rejects, so the
-  build compiles the C with **clang-cl**. Install LLVM: `winget install LLVM.LLVM`
-  (build.rs auto-detects `C:\Program Files\LLVM\bin\clang-cl.exe`, or set
-  `CLANG_CL`). A POSIX `stpcpy` shim (`src-tauri/cbits/win_compat.h`) is
-  force-included on Windows; the vendored `ft8_lib` is left unmodified.
-- macOS/Linux use the default clang/gcc (VLAs + `stpcpy` already supported).
-
-## Develop / run
-
-```
+```sh
 cd desktop
-npm install
-npm run tauri dev      # starts Vite + builds the Rust app + opens the window
+npm ci
+npm run build
+cd src-tauri
+cargo test --locked --all-targets -j 2
+cargo build --locked --release -j 2
 ```
 
-> **Windows Smart App Control:** freshly-built unsigned binaries can be blocked
-> (`os error 4551`, "Application Control policy"). The GUI app generally runs, but
-> SAC consistently blocks the unsigned **`cargo test`** binary because it does
-> runtime `LoadLibrary` (for Hamlib via `libloading`). Sign the binaries, or test
-> on a machine without Smart App Control. The app itself is unaffected.
+For interactive development, run `npm run tauri dev` from `desktop/`.
+`build.rs` only generates Tauri context and copies existing Windows Hamlib
+DLLs. Hamlib loads dynamically; Linux/macOS need a system Hamlib installation
+for that backend. FLrig XML-RPC and direct serial CAT (Yaesu/Kenwood/Icom)
+remain available; CAT and audio are separate connections.
 
-### Rig control: Hamlib (bundled)
+## Android parity fixtures
 
-Hamlib is the default rig backend and is **bundled with the app on Windows** — the
-LGPL Hamlib DLLs live in `src-tauri/hamlib/` and `build.rs` copies them next to
-the built exe, so rig support works out of the box with no separate install.
-Settings → Rig control → **Hamlib** shows a dropdown of every radio Hamlib
-supports (~300+); pick yours, choose **Connection: Serial** (COM port + baud) or
-**Network** (host:port), and Connect. Hamlib handles the model-specific CAT
-protocol. (`Dummy` needs no hardware.)
+`rttyaf/app/src/test/resources/rtty/vectors.tsv` and its little-endian PCM16
+files are generated by the **actual Android Kotlin encoder**, not by Rust.
+`RttyGoldenVectors.main` is the explicit regeneration entry point. The manifest
+covers letters/figures/control characters, USOS on/off, reversed polarity,
+different baud/shift/tone choices, short stops and long fractional timing.
 
-**FlexRadio 6xxx:** two ways — (a) model **Kenwood TS-2000** + Serial, pointed at
-your SmartSDR CAT virtual COM port (SmartSDR CAT emulates a TS-2000); or
-(b) the native **FlexRadio 6xxx** model + Network, address `localhost:4992` (the
-SmartSDR API). Note DAX is *audio* (set as the audio device), separate from CAT.
+Android `RttyGoldenTest` requires exact PCM equality and streaming decode.
+Rust tests require matching sample counts, at most one PCM LSB error at every
+sample, and correct decode of Android PCM with irregular chunk boundaries.
+Independent tone-crossing/timing checks, noisy/detuned decode, silence and wrong
+polarity controls supplement the shared goldens. No hardware is simulated by
+these modem tests and they do not validate USB/CAT/PTT/RF operation.
 
-The backend dynamically loads the library at runtime (`libloading`), so there's
-no build-time Hamlib dependency. To update Hamlib, replace the DLLs in
-`src-tauri/hamlib/` (from a hamlib-w64 release). On Linux/macOS, install the
-system `hamlib`/`libhamlib` package; if the library isn't found the rig list is
-empty and you get a clean message rather than a crash.
-
-> If you later enable Tauri bundling (`bundle.active`), add `hamlib/*.dll` to the
-> bundle `resources` so they ship in the installer too.
-
-## Build / test
-
-```
-cd desktop/src-tauri
-cargo test            # DSP round-trip, QSO state machine, rig commands, DB/ADIF
-cargo build --release # optimized binary (loads the bundled frontend in ../dist)
+```sh
+cd rttyaf
+./gradlew --no-daemon --max-workers=1 \
+  -Pkotlin.compiler.execution.strategy=in-process \
+  -Dorg.gradle.jvmargs='-Xmx1536m -Dfile.encoding=UTF-8' \
+  :ham-radio-core:test testDebugUnitTest --tests '*RttyGoldenTest'
 ```
 
-The frontend builds independently with `npm run build` (emits to `desktop/dist`).
+## Source layout
 
-## How it works
+- `src-tauri/src/dsp/mod.rs`: Rust RTTY configuration, Baudot codec, FSK
+  synthesis and streaming demodulator.
+- `audio/`: cpal capture/playback, resampling and bounded continuous RX queue.
+- `engine.rs`: continuous RX, manually initiated TX, PTT and event lifecycle.
+- `rig.rs`: Hamlib, FLrig and serial CAT; `db.rs`: SQLite/ADIF.
+- `wf.rs`: independent live FFT waterfall (window/size/averaging settings do
+  not alter the demodulator).
+- `src/{App.tsx,ipc.ts}`: RTTY controls, streaming text, logbook and typed IPC.
 
-- **Decode:** audio is captured continuously (cpal), resampled to 12 kHz, and
-  windowed into 15 s slots aligned to the UTC cycle. Each slot is fed to the C
-  decoder; decodes stream to the UI as `decoded` events.
-- **Transmit:** the QSO engine decides the next message; on our TX slot the
-  engine encodes it (`generate_ft8`), keys PTT via the rig, and plays the GFSK
-  waveform. Leading audio is clipped only when starting late
-  (`ms_late = max(0, into_cycle - 2360)`) to preserve the Costas sync arrays.
-- **Logging:** completed QSOs are written to SQLite and exportable as ADIF.
+## Delivery boundary
 
-## Waterfall display pipeline (developer settings)
-
-The live waterfall is computed in Rust (`src-tauri/src/wf.rs`, driven from
-`engine.rs::emit_waterfall_row`) — it is separate from the decoder's internal
-FFT, so none of these settings affect decoding. Per row (~10×/s):
-
-1. Peek the most recent `fft_size + (avg-1)*fft_size/2` samples (12 kHz mono).
-2. Welch average: `avg` overlapping segments (50% overlap), each windowed and
-   FFT'd; power `re²+im²` summed per bin.
-3. `mag = sqrt(power/avg) * 2 / fft_size`, `dB = 20·log10(mag + 1e-12)`.
-4. Noise floor = 30th-percentile dB, smoothed over time with an EMA
-   (`floor = 0.9·floor + 0.1·pct`, initialized at −60 dB).
-5. Brightness: 0 at `floor + 4 dB` (black offset), 255 at 26 dB above that
-   (span); linear in between.
-6. Emitted as `WaterfallRow { bins, hz_per_col }` up to 3500 Hz; the canvas
-   draws 1 bin = 1 column and the browser scales to CSS pixels, so there is no
-   bins-per-pixel aggregation step on desktop (unlike Android's spectrum strip).
-
-Settings → *Developer — waterfall FFT* exposes the window function
-(Rect/Hann/Hamming/Blackman/Blackman-Harris), FFT size (512–8192), and
-averaging count (1–16) for issue #428 experiments. Defaults — **Hann, 2048
-(≈5.86 Hz/bin), 6 averages** — reproduce the previous hard-coded pipeline
-exactly and intentionally match the iOS app. Changing a knob rebuilds the FFT
-plan immediately and persists to the config table (`wf_window`, `wf_fft_size`,
-`wf_avg`); the noise-floor EMA restarts and reconverges within ~2 s.
-
-Note: `EngineEvent::Waterfall` / `dsp/decoder.rs::waterfall_heatmap` is a dead
-legacy path (never emitted); the live path above is the only one rendered.
+Feature/PR workflows compile and test only. Guarded main/staging pushes can
+create `desktop-dev.<run>` **prereleases for internal testing**. Explicit
+`desktop-v*` tag behavior remains in the workflow but is **not authorized** by
+this port. No production tag, release or promotion is permitted until Patrick
+tests all five apps and subsequently gives explicit production approval.
+Human review of the exact port head and successful hosted three-OS builds plus
+Rust coverage are required before considering an internal merge.

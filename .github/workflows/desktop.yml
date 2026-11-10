@@ -15,7 +15,7 @@ name: Desktop CI & Release
 # explicit approval. Do not create a production tag as part of internal delivery.
 #
 # PATH-FILTERED: PRs and dev pushes only build when desktop/**, this workflow,
-# or its release-policy tests change. The legacy FT8 DSP dependency is unresolved.
+# its Android modem fixtures, or release-policy tests change.
 # staging/main pushes and desktop-v* tags always build. The always-run
 # `desktop-gate` job is the required status check.
 
@@ -66,6 +66,8 @@ jobs:
               - 'desktop/**'
               - '.github/workflows/desktop.yml'
               - '.github/scripts/test_desktop_release.py'
+              - 'rttyaf/app/src/main/kotlin/radio/ks3ckc/rttyaf/rtty/**'
+              - 'rttyaf/app/src/test/resources/rtty/**'
 
       - name: Decide whether to run
         id: decide
@@ -194,23 +196,35 @@ jobs:
             curl \
             wget
 
-      # build.rs compiles the C core with clang-cl on the windows-msvc target
-      # (MSVC's cl.exe rejects ft8_lib's C99 VLAs). LLVM/clang-cl is preinstalled
-      # on the GitHub windows runners; this just confirms it's resolvable.
-      - name: Verify clang-cl (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: clang-cl --version || echo "::warning::clang-cl not on PATH; build.rs falls back to C:\\Program Files\\LLVM\\bin"
-
       - name: Install frontend dependencies
         working-directory: desktop
         run: npm ci
+
+      - name: Build frontend for Rust test context
+        working-directory: desktop
+        run: npm run build
+
+      - name: Test RTTY modem and engine on this OS
+        working-directory: desktop/src-tauri
+        run: cargo test --locked --all-targets -j 2
 
       # --- Non-release: compile check only (no bundles), fastest path. ---
       - name: Compile check (no bundle)
         if: ${{ needs.version.outputs.should_release != 'true' }}
         working-directory: desktop
         run: npm run tauri build -- --no-bundle
+
+      - name: Upload unsigned PR executable for internal testing
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rttyaf-desktop-internal-${{ matrix.os }}-${{ github.event.pull_request.head.sha }}
+          retention-days: 14
+          if-no-files-found: error
+          path: |
+            desktop/src-tauri/target/release/rttyaf
+            desktop/src-tauri/target/release/rttyaf.exe
+            desktop/src-tauri/target/release/*.dll
 
       # --- Release: build native bundles and upload to the per-platform release.
       # tauri.conf.json has bundle.active=false (keeps local dev builds bundle-
@@ -227,7 +241,7 @@ jobs:
           projectPath: desktop
           tagName: ${{ needs.version.outputs.release_tag }}
           releaseName: ${{ needs.version.outputs.release_tag }}
-          releaseBody: 'FT8AF desktop build ${{ needs.version.outputs.version_name }}.'
+          releaseBody: 'RTTYAF desktop build ${{ needs.version.outputs.version_name }}.'
           prerelease: ${{ needs.version.outputs.is_prerelease == 'true' }}
           args: --config '{"bundle":{"active":true}}'
 

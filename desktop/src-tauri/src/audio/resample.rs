@@ -1,4 +1,4 @@
-//! Streaming sample-rate conversion to/from the FT8 codec's fixed 12 kHz rate.
+//! Streaming sample-rate conversion to/from the RTTY modem's fixed 12 kHz rate.
 //!
 //! Desktop hardware rarely offers 12 kHz directly (Android forced it on
 //! AudioRecord), so we resample the device's native rate. Uses rubato's

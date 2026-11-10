@@ -1,18 +1,19 @@
-// FT8AF desktop — Tauri entry point. Owns the SQLite DB and the runtime engine,
+// RTTYAF desktop — Tauri entry point. Owns the SQLite DB and the runtime engine,
 // exposes commands to the web UI, and forwards engine events to the webview.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 
-use ft8af::audio::{self, AudioDevice};
-use ft8af::bands;
-use ft8af::db::{Db, QsoRecord};
-use ft8af::engine::{self, AnswerArgs, EngineCommand, EngineHandle};
-use ft8af::rig::{self, HamlibRig, RigConfig, SerialPortInfo};
-use ft8af::wf::WfConfig;
+use rttyaf::audio::{self, AudioDevice};
+use rttyaf::bands;
+use rttyaf::db::{Db, QsoRecord};
+use rttyaf::dsp::RttyConfig;
+use rttyaf::engine::{self, EngineCommand, EngineHandle};
+use rttyaf::rig::{self, HamlibRig, RigConfig, SerialPortInfo};
+use rttyaf::wf::WfConfig;
 
 struct AppState {
     engine: EngineHandle,
@@ -23,6 +24,8 @@ struct AppState {
 struct BandInfo {
     name: String,
     dial_hz: u64,
+    lo_hz: u64,
+    hi_hz: u64,
 }
 
 // --- device / port / band enumeration --------------------------------------
@@ -49,9 +52,14 @@ fn list_hamlib_rigs() -> Vec<HamlibRig> {
 
 #[tauri::command]
 fn list_bands() -> Vec<BandInfo> {
-    bands::FT8_BANDS
+    bands::RTTY_BANDS
         .iter()
-        .map(|b| BandInfo { name: b.name.to_string(), dial_hz: b.dial_hz })
+        .map(|b| BandInfo {
+            name: b.name.to_string(),
+            dial_hz: b.dial_hz,
+            lo_hz: b.lo_hz,
+            hi_hz: b.hi_hz,
+        })
         .collect()
 }
 
@@ -78,8 +86,8 @@ fn set_band(state: State<AppState>, dial_hz: u64) {
 }
 
 #[tauri::command]
-fn set_base_freq(state: State<AppState>, hz: i32) {
-    state.engine.send(EngineCommand::SetBaseFreq(hz));
+fn set_modem(state: State<AppState>, config: RttyConfig) {
+    state.engine.send(EngineCommand::SetModem(config));
 }
 
 #[tauri::command]
@@ -115,21 +123,6 @@ fn refresh_status(state: State<AppState>) {
 #[tauri::command]
 fn resync_time(state: State<AppState>) {
     state.engine.send(EngineCommand::ResyncTime);
-}
-
-#[tauri::command]
-fn start_cq(state: State<AppState>) {
-    state.engine.send(EngineCommand::StartCq);
-}
-
-#[tauri::command]
-fn answer(state: State<AppState>, args: AnswerArgs) {
-    state.engine.send(EngineCommand::Answer(args));
-}
-
-#[tauri::command]
-fn set_stage(state: State<AppState>, stage: ft8af::qso::TxStage) {
-    state.engine.send(EngineCommand::SetStage(stage));
 }
 
 #[tauri::command]
@@ -192,7 +185,7 @@ fn set_waterfall_config(state: State<AppState>, config: WfConfig) {
 }
 
 fn main() {
-    // Debug helper: `ft8af --list-rigs` prints the Hamlib-enumerated rig count
+    // Debug helper: `rttyaf --list-rigs` prints the Hamlib-enumerated rig count
     // and exits — verifies the bundled Hamlib library loads without the GUI.
     if std::env::args().any(|a| a == "--list-rigs") {
         let rigs = rig::list_hamlib_rigs();
@@ -205,11 +198,9 @@ fn main() {
 
     let data_dir = dirs::data_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("FT8AF");
+        .join("RTTYAF");
     let _ = std::fs::create_dir_all(&data_dir);
-    let db = Arc::new(
-        Db::open(data_dir.join("ft8af.sqlite")).expect("failed to open database"),
-    );
+    let db = Arc::new(Db::open(data_dir.join("rttyaf.sqlite")).expect("failed to open database"));
 
     let (engine, evt_rx) = engine::spawn(db.clone());
 
@@ -219,7 +210,7 @@ fn main() {
             // Forward engine events to the webview on the "engine-event" channel.
             let handle = app.handle().clone();
             std::thread::Builder::new()
-                .name("ft8af-event-forwarder".into())
+                .name("rttyaf-event-forwarder".into())
                 .spawn(move || {
                     while let Ok(ev) = evt_rx.recv() {
                         // Mirror status messages to the terminal. The app has no
@@ -227,8 +218,8 @@ fn main() {
                         // failed") were previously invisible outside the in-app
                         // status line — making remote diagnosis impossible.
                         match &ev {
-                            engine::EngineEvent::Error(m) => eprintln!("[ft8af] ERROR: {m}"),
-                            engine::EngineEvent::Info(m) => eprintln!("[ft8af] {m}"),
+                            engine::EngineEvent::Error(m) => eprintln!("[rttyaf] ERROR: {m}"),
+                            engine::EngineEvent::Info(m) => eprintln!("[rttyaf] {m}"),
                             _ => {}
                         }
                         let _ = handle.emit("engine-event", ev);
@@ -246,7 +237,7 @@ fn main() {
             stop_decode,
             set_station,
             set_band,
-            set_base_freq,
+            set_modem,
             set_tx_gain,
             set_input_device,
             set_output_device,
@@ -254,9 +245,6 @@ fn main() {
             disconnect_rig,
             refresh_status,
             resync_time,
-            start_cq,
-            answer,
-            set_stage,
             stop_tx,
             free_text,
             list_log,
@@ -269,6 +257,11 @@ fn main() {
             all_config,
             set_waterfall_config,
         ])
-        .run(tauri::generate_context!())
-        .expect("error running FT8AF");
+        .build(tauri::generate_context!())
+        .expect("error building RTTYAF")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::ExitRequested { .. }) {
+                app.state::<AppState>().engine.shutdown();
+            }
+        });
 }

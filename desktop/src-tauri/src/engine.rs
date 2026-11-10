@@ -1,91 +1,46 @@
-//! The runtime engine: a dedicated thread that owns audio + decoder + QSO state
-//! machine + rig, runs the 15 s UTC cycle (ports `UtcTimer`), and turns QSO
-//! decisions into encode + PTT + playback + DB writes. Communicates with the
-//! Tauri layer over command/event channels so the cpal `Stream`s (which are
-//! `!Send` on Windows) never leave this thread.
+//! Continuous RTTY receiver and manually initiated, single-over transmitter.
+//! Audio streams and rig stay on this thread (cpal is !Send on Windows).
 
+use serde::Serialize;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-
-use crate::audio::{output, AudioInput, SlotAccumulator};
+use crate::audio::{output, AudioInput, CaptureBuffer};
 use crate::bands;
-use crate::db::{Db, QsoRecord};
-use crate::dsp::{DecodedMessage, Decoder, SAMPLE_RATE};
-use crate::qso::{QsoEngine, QsoOutcome, QsoStatus};
+use crate::db::Db;
+use crate::dsp::{self, Decoder, RttyConfig, SAMPLE_RATE};
 use crate::rig::{RigConfig, RigConnection};
 use crate::util;
-use crate::wf::{WfConfig, WfProcessor, WfWindow};
+use crate::wf::{WfConfig, WfProcessor};
 
-const CYCLE_MS: i64 = 15_000;
-const TX_SLACK_MS: i64 = 2_360; // 12.64 s audio in a 15 s slot
 const PTT_DELAY_MS: u64 = 100;
-// Latest point into the cycle we can still key up and have the full 12.64 s
-// waveform (plus the PTT lead) land before the next slot boundary. Start later
-// than this and the leading Costas array gets clipped — audible but undecodable.
-const TX_LATEST_MS: i64 = TX_SLACK_MS - PTT_DELAY_MS as i64;
-// Point in the (rx-corrected) cycle at which we hand the slot to the decoder.
-// The FT8 waveform is complete at 12.64 s, so decoding ~0.6 s later returns
-// results around the 15 s boundary even on a slow CPU — early enough that the
-// operator's reply lands in the very next slot instead of skipping a cycle.
-// The rx-offset calibration aligns this clock to the real signal timing, and
-// any positive capture latency only pushes the real trigger later (safer), so
-// 13.2 s keeps a comfortable margin above the 12.64 s waveform end.
-const DECODE_AT_MS: i64 = 13_200;
-const DEFAULT_TX_AUDIO_HZ: i32 = 1_500;
-// Default TX output level (0.0–1.0). Slightly below full scale so a fresh
-// install doesn't overdrive the soundcard/ALC before the operator sets it.
-const DEFAULT_TX_GAIN: f32 = 0.9;
-
-/// Clamp a requested TX gain into the valid 0.0–1.0 range (full scale).
-fn clamp_tx_gain(g: f32) -> f32 {
-    g.clamp(0.0, 1.0)
-}
-// Live-waterfall FFT parameters (window/size/averaging + display constants)
-// live in `crate::wf` and are runtime-configurable via SetWaterfallConfig.
-// Input RMS at/below this (dBFS) counts as silence — no audio reaching the app.
-// Real RX audio through a soundcard/DAX sits well above this even on a quiet band;
-// a fully-routed-but-silent virtual device floors near -100 dBFS.
 const SILENCE_DBFS: f32 = -75.0;
 
-/// RMS level of a mono buffer in dBFS (0 dB = full scale). Empty or all-zero
-/// input returns a large negative number rather than -inf, so the meter and the
-/// silence test stay finite.
 fn rms_dbfs(samples: &[f32]) -> f32 {
     if samples.is_empty() {
         return -120.0;
     }
-    let sum_sq: f64 = samples.iter().map(|&s| (s as f64) * (s as f64)).sum();
-    let rms = (sum_sq / samples.len() as f64).sqrt();
-    (20.0 * (rms.max(1e-12)).log10()).max(-120.0) as f32
+    let power: f64 = samples.iter().map(|&s| (s as f64).powi(2)).sum();
+    (10.0 * (power / samples.len() as f64).max(1e-12).log10()) as f32
 }
 
-/// True once per cycle, on the first waterfall row at/after a 15 s boundary on
-/// the rx-corrected clock, advancing `last_slot`. The live waterfall draws audio
-/// on real time while the decoder measures DT on the rx-corrected clock (shifted
-/// by capture latency), so the spectrum reads ahead of the DT; marking the cycle
-/// grid on the corrected clock gives both the same time reference.
-fn wf_boundary_row(corrected_now_ms: i64, last_slot: &mut i64) -> bool {
-    let slot = corrected_now_ms.div_euclid(CYCLE_MS);
-    if slot != *last_slot {
-        *last_slot = slot;
-        true
+fn clamp_tx_gain(g: f32) -> f32 {
+    if g.is_finite() {
+        g.clamp(0.0, 1.0)
     } else {
-        false
+        0.0
     }
 }
 
-// --- messages crossing the channel boundary --------------------------------
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AnswerArgs {
-    pub call_from: String,
-    #[serde(default)]
-    pub grid: String,
-    #[serde(default)]
-    pub snr: i32,
+fn validate_tx(text: &str, config: RttyConfig) -> Result<String, String> {
+    if text.chars().count() > 1000 {
+        return Err("An RTTY over is limited to 1000 characters".into());
+    }
+    if dsp::text_to_codes(text.trim(), config).len() <= 1 {
+        return Err("Enter text supported by US-TTY Baudot before transmitting".into());
+    }
+    Ok(dsp::tx_message(text))
 }
 
 #[derive(Debug, Clone)]
@@ -94,60 +49,25 @@ pub enum EngineCommand {
     StopDecode,
     SetStation { call: String, grid: String },
     SetBand(u64),
-    SetBaseFreq(i32),
-    /// TX output level, 0.0–1.0 (drive into the soundcard/USB audio path).
+    SetModem(RttyConfig),
     SetTxGain(f32),
     SetInputDevice(Option<String>),
     SetOutputDevice(Option<String>),
     SelectRig(RigConfig),
-    /// Drop the live rig connection for this session (CAT/PTT released). Leaves
-    /// the saved rig config intact so Connect — or the next launch — reconnects.
     DisconnectRig,
-    StartCq,
-    Answer(AnswerArgs),
-    /// Operator manually selects which QSO message to transmit next.
-    SetStage(crate::qso::TxStage),
     StopTx,
     FreeText(String),
-    /// Re-emit the current rig + TX status. Lets a freshly-loaded UI sync up with
-    /// state set before its event listener existed (e.g. the startup auto-reconnect).
     RefreshStatus,
-    /// Apply a fresh NTP clock offset (ms to add to local time to get true UTC).
     SetClockOffset(i64),
-    /// Kick off an immediate one-shot NTP re-sync (manual "Resync" button).
     ResyncTime,
-    /// Apply new live-waterfall FFT parameters (developer knobs, issue #428).
     SetWaterfallConfig(WfConfig),
     Shutdown,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct UiMessage {
-    pub utc_ms: i64,
-    pub call_to: String,
-    pub call_from: String,
-    pub extra: String,
-    pub grid: String,
-    pub snr: i32,
-    pub freq_hz: f32,
-    pub time_sec: f32,
-    pub text: String,
-    pub is_cq: bool,
-    pub to_me: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct CycleTick {
-    pub utc_ms: i64,
-    pub sequential: i64,
-    pub ms_into_cycle: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TxStateEvent {
     pub transmitting: bool,
     pub message: Option<String>,
-    pub status: QsoStatus,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -160,49 +80,27 @@ pub struct RigStatusEvent {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ClockSyncEvent {
-    /// ms added to the local clock to get true UTC (negative = local is fast).
     pub offset_ms: i64,
-    /// true once an NTP sync has succeeded this session (or a saved offset was restored).
     pub synced: bool,
-    /// Auto-calibrated audio-capture latency compensation (ms) applied to the RX window.
-    pub rx_offset_ms: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct WaterfallFrame {
-    /// Magnitude bins (0..=255) for the displayed audio band of one slot,
-    /// downsampled server-side. `cols` bins per row, `rows` time rows.
-    pub bins: Vec<u8>,
-    pub rows: usize,
-    pub cols: usize,
-    pub hz_per_col: f32,
-}
-
-/// A single live spectrum row (emitted ~10×/s) for the scrolling waterfall.
 #[derive(Debug, Clone, Serialize)]
 pub struct WaterfallRow {
     pub bins: Vec<u8>,
     pub hz_per_col: f32,
-    /// True on the first row at/after a 15 s cycle boundary (on the rx-corrected
-    /// clock the decoder measures DT against). The UI draws a grid line there so
-    /// the spectrum lines up with decode DT instead of reading ahead of it.
-    pub boundary: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum EngineEvent {
-    Decoded(Vec<UiMessage>),
-    Cycle(CycleTick),
+    Received(String),
+    Clock(i64),
+    ClockSync(ClockSyncEvent),
     TxState(TxStateEvent),
     RigStatus(RigStatusEvent),
-    ClockSync(ClockSyncEvent),
-    QsoCompleted(QsoRecord),
-    Waterfall(WaterfallFrame),
+    Modem(RttyConfig),
+    Decoding(bool),
     WaterfallRow(WaterfallRow),
-    /// Periodic RX input level (~1/s while decoding) so the UI can show a meter
-    /// and warn when the captured audio is silent (e.g. the source/DAX channel
-    /// isn't routed) instead of leaving a mysteriously blank waterfall.
     InputLevel(InputLevelEvent),
     Info(String),
     Error(String),
@@ -210,182 +108,113 @@ pub enum EngineEvent {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct InputLevelEvent {
-    /// RMS level of the recent capture in dBFS (≈ -100 for digital silence).
     pub db: f32,
-    /// True when the level is at/below the silence floor while decoding — the
-    /// "no audio reaching the app" condition.
     pub silent: bool,
 }
 
-/// Thread-safe handle for sending commands to the engine. Wraps the `Sender` in
-/// a mutex so it satisfies Tauri managed-state's `Sync` bound regardless of the
-/// `mpsc::Sender` auto-trait situation.
 pub struct EngineHandle {
     tx: parking_lot::Mutex<Sender<EngineCommand>>,
+    worker: parking_lot::Mutex<Option<std::thread::JoinHandle<()>>>,
 }
-
 impl EngineHandle {
     pub fn send(&self, cmd: EngineCommand) {
         let _ = self.tx.lock().send(cmd);
     }
+    /// Wait for audio shutdown and the PTT-OFF attempt before the app exits.
+    pub fn shutdown(&self) {
+        self.send(EngineCommand::Shutdown);
+        if let Some(worker) = self.worker.lock().take() {
+            let _ = worker.join();
+        }
+    }
 }
 
-/// Spawn the engine thread. Returns a command handle and the event receiver.
 pub fn spawn(db: Arc<Db>) -> (EngineHandle, Receiver<EngineEvent>) {
     let (cmd_tx, cmd_rx) = std::sync::mpsc::channel();
     let (evt_tx, evt_rx) = std::sync::mpsc::channel();
-    // Background NTP time sync: corrects the app's clock without admin rights or
-    // external software. Feeds offsets back through the command channel.
     crate::timesync::spawn_loop(cmd_tx.clone());
-    let engine_cmd_tx = cmd_tx.clone();
-    std::thread::Builder::new()
-        .name("ft8af-engine".into())
+    let sync_tx = cmd_tx.clone();
+    let worker = std::thread::Builder::new()
+        .name("rttyaf-engine".into())
         .spawn(move || {
-            let mut engine = Engine::new(db, evt_tx, engine_cmd_tx);
+            let mut engine = Engine::new(db, evt_tx, sync_tx);
             engine.run(cmd_rx);
         })
         .expect("spawn engine thread");
-    (EngineHandle { tx: parking_lot::Mutex::new(cmd_tx) }, evt_rx)
+    (
+        EngineHandle {
+            tx: parking_lot::Mutex::new(cmd_tx),
+            worker: parking_lot::Mutex::new(Some(worker)),
+        },
+        evt_rx,
+    )
 }
 
 struct Engine {
     db: Arc<Db>,
     evt: Sender<EngineEvent>,
-    accum: Arc<SlotAccumulator>,
-    slot_tx: Sender<Vec<f32>>,
-    dec_rx: Receiver<Vec<DecodedMessage>>,
-    txed_slot: i64,
-    qso: QsoEngine,
+    cmd_tx: Sender<EngineCommand>,
+    accum: Arc<CaptureBuffer>,
+    decoder: Decoder,
+    config: RttyConfig,
     rig: Option<RigConnection>,
     input: Option<AudioInput>,
     input_device: Option<String>,
     output_device: Option<String>,
-    decoding: bool,
     dial_hz: u64,
-    tx_audio_hz: i32,
-    /// TX output level (0.0–1.0) applied to the waveform before playback.
     tx_gain: f32,
-    /// Slot id (rx-corrected clock) most recently handed to the decode worker.
-    /// Guards the once-per-slot early decode trigger in the run loop.
-    last_decoded_slot: i64,
-    /// Audio-capture latency compensation (ms). The RX decode window is sliced
-    /// this much later than the UTC cycle boundary so that buffered/late-arriving
-    /// input audio lands aligned — drives decoded DT toward 0. Auto-calibrated
-    /// from the median DT of each slot's decodes; persisted across sessions.
-    rx_offset_ms: i64,
-    last_tick_ms: i64,
-    tx_parity: Option<i64>,
+    ptt: bool,
+    tx_playback: Option<output::PreparedTx>,
+    tx_message: Option<String>,
     clock_offset_ms: i64,
     time_synced: bool,
-    /// Clone of the command sender so background helpers (NTP sync) can feed
-    /// results back into this loop.
-    cmd_tx: Sender<EngineCommand>,
-    ptt: bool,
-    /// In-flight TX playback, if any. Held on this thread (the cpal stream is
-    /// `!Send`); polled each loop tick so completion drops PTT, and dropped to
-    /// stop audio immediately on Stop TX.
-    tx_playback: Option<output::PreparedTx>,
-    // live waterfall FFT (plan + window table + floor state; rebuilt on config change)
     wf: WfProcessor,
-    last_wf_slot: i64, // last cycle slot marked on the live waterfall (rx-corrected)
 }
 
 impl Engine {
     fn new(db: Arc<Db>, evt: Sender<EngineEvent>, cmd_tx: Sender<EngineCommand>) -> Self {
-        // Restore persisted station + band where present.
-        let my_call = db.get_config("my_call").unwrap_or_default();
-        let my_grid = db.get_config("my_grid").unwrap_or_default();
+        let config = db
+            .get_config("rtty_modem")
+            .and_then(|s| serde_json::from_str::<RttyConfig>(&s).ok())
+            .filter(|c| c.validate().is_ok() && c.sample_rate == SAMPLE_RATE)
+            .unwrap_or_default();
         let dial_hz = db
             .get_config("dial_hz")
             .and_then(|s| s.parse().ok())
             .unwrap_or(bands::default_band().dial_hz);
-        let input_device = db.get_config("input_device").filter(|s| !s.is_empty());
-        let output_device = db.get_config("output_device").filter(|s| !s.is_empty());
-        let tx_audio_hz = db
-            .get_config("base_freq")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(DEFAULT_TX_AUDIO_HZ);
         let tx_gain = db
             .get_config("tx_gain")
-            .and_then(|s| s.parse::<f32>().ok())
-            .map(clamp_tx_gain)
-            .unwrap_or(DEFAULT_TX_GAIN);
-        // Restore the last NTP offset so DT is roughly right immediately, before
-        // the first fresh sync of this session lands. Treated as already-synced.
-        let saved_offset: Option<i64> = db.get_config("clock_offset_ms").and_then(|s| s.parse().ok());
-        let rx_offset_ms: i64 = db
-            .get_config("rx_offset_ms")
             .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
-        let mut qso = QsoEngine::new(my_call, my_grid);
-        qso.band = bands::band_for_freq_hz(dial_hz).to_string();
-        qso.freq_mhz = bands::freq_mhz_string(dial_hz);
-
-        // Restore persisted waterfall FFT knobs (issue #428); defaults match
-        // the historical hard-coded pipeline (Hann, 2048, 6-segment Welch).
-        let wf_defaults = WfConfig::default();
-        let wf_cfg = WfConfig {
-            window: db
-                .get_config("wf_window")
-                .map(|s| WfWindow::parse(&s))
-                .unwrap_or(wf_defaults.window),
-            fft_size: db
-                .get_config("wf_fft_size")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(wf_defaults.fft_size),
-            avg: db
-                .get_config("wf_avg")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(wf_defaults.avg),
-        }
-        .sanitize();
-        let wf = WfProcessor::new(wf_cfg);
-
-        // Decode worker: owns the (!Send) Decoder on its own thread so the heavy
-        // per-slot DSP never blocks the engine loop (which drives the live
-        // waterfall + UTC clock). Fed slot audio over a channel; returns decodes.
-        let (slot_tx, slot_rx) = std::sync::mpsc::channel::<Vec<f32>>();
-        let (dec_tx, dec_rx) = std::sync::mpsc::channel::<Vec<DecodedMessage>>();
-        std::thread::Builder::new()
-            .name("ft8af-decoder".into())
-            .spawn(move || {
-                let mut decoder = Decoder::new(SAMPLE_RATE, true);
-                while let Ok(slot) = slot_rx.recv() {
-                    decoder.feed_slot(&slot);
-                    let n = decoder.find_sync();
-                    let msgs = if n > 0 { decoder.decode_all() } else { Vec::new() };
-                    let _ = dec_tx.send(msgs);
-                }
-            })
-            .expect("spawn decoder thread");
-
-        Engine {
+            .map(clamp_tx_gain)
+            .unwrap_or(0.9);
+        let input_device = db.get_config("input_device").filter(|s| !s.is_empty());
+        let output_device = db.get_config("output_device").filter(|s| !s.is_empty());
+        let offset = db
+            .get_config("clock_offset_ms")
+            .and_then(|s| s.parse().ok());
+        let wf_config = db
+            .get_config("waterfall")
+            .and_then(|s| serde_json::from_str::<WfConfig>(&s).ok())
+            .unwrap_or_default();
+        Self {
             db,
             evt,
-            accum: Arc::new(SlotAccumulator::new()),
-            slot_tx,
-            dec_rx,
-            txed_slot: -1,
-            qso,
+            cmd_tx,
+            accum: Arc::new(CaptureBuffer::new()),
+            decoder: Decoder::new(config).expect("validated modem"),
+            config,
             rig: None,
             input: None,
             input_device,
             output_device,
-            decoding: false,
             dial_hz,
-            tx_audio_hz,
             tx_gain,
-            last_decoded_slot: -1,
-            rx_offset_ms,
-            last_tick_ms: 0,
-            tx_parity: None,
-            clock_offset_ms: saved_offset.unwrap_or(0),
-            time_synced: saved_offset.is_some(),
-            cmd_tx,
             ptt: false,
             tx_playback: None,
-            wf,
-            last_wf_slot: -1,
+            tx_message: None,
+            clock_offset_ms: offset.unwrap_or(0),
+            time_synced: offset.is_some(),
+            wf: WfProcessor::new(wf_config.sanitize()),
         }
     }
 
@@ -393,314 +222,165 @@ impl Engine {
         util::now_unix_ms() + self.clock_offset_ms
     }
 
-    fn run(&mut self, cmd_rx: Receiver<EngineCommand>) {
-        // Reconnect the last-used rig on startup (non-fatal if it can't).
-        if let Some(json) = self.db.get_config("rig_config") {
-            if let Ok(cfg) = serde_json::from_str::<RigConfig>(&json) {
-                if cfg.backend != crate::rig::RigBackend::None {
-                    self.select_rig(cfg);
-                }
+    fn run(&mut self, commands: Receiver<EngineCommand>) {
+        if let Some(cfg) = self
+            .db
+            .get_config("rig_config")
+            .and_then(|s| serde_json::from_str::<RigConfig>(&s).ok())
+        {
+            if cfg.backend != crate::rig::RigBackend::None {
+                self.select_rig(cfg);
             }
         }
-
+        let mut last_tick = 0;
         loop {
-            // Drain pending commands.
             loop {
-                match cmd_rx.try_recv() {
-                    Ok(EngineCommand::Shutdown) | Err(TryRecvError::Disconnected) => return,
+                match commands.try_recv() {
+                    Ok(EngineCommand::Shutdown) | Err(TryRecvError::Disconnected) => {
+                        self.finalize_tx();
+                        return;
+                    }
                     Ok(cmd) => self.handle(cmd),
                     Err(TryRecvError::Empty) => break,
                 }
             }
-
-            let now = self.now();
-            let ms_into = now.rem_euclid(CYCLE_MS);
-            let slot_id = now.div_euclid(CYCLE_MS);
-
-            // 1 Hz UI clock.
-            if now - self.last_tick_ms >= 1000 {
-                self.last_tick_ms = now;
-                self.emit(EngineEvent::Cycle(CycleTick {
-                    utc_ms: now,
-                    sequential: slot_id.rem_euclid(2),
-                    ms_into_cycle: ms_into,
-                }));
-                // RX input level + silence warning, once we're capturing. Surfaces
-                // a dead source (e.g. DAX channel not routed) that otherwise looks
-                // like a broken waterfall.
-                if self.decoding {
-                    let recent = self.accum.peek_recent(SAMPLE_RATE as usize / 2); // ~0.5 s
-                    let db = rms_dbfs(&recent);
+            if self
+                .tx_playback
+                .as_ref()
+                .is_some_and(|p| p.is_done() || p.timed_out())
+            {
+                self.finalize_tx();
+            }
+            if self.input.is_some() {
+                let (samples, overflow) = self.accum.drain();
+                if overflow {
+                    self.reset_decoder();
+                    self.emit(EngineEvent::Error(
+                        "RX buffer overflow; partial RTTY frame discarded".into(),
+                    ));
+                }
+                if self.tx_playback.is_none() {
+                    let text = self.decoder.process(&samples);
+                    if !text.is_empty() {
+                        self.emit(EngineEvent::Received(text));
+                    }
+                }
+                if let Some((bins, hz_per_col)) = self.wf.process_row(
+                    &self.accum.peek_recent(self.wf.samples_needed()),
+                    SAMPLE_RATE as f32,
+                ) {
+                    self.emit(EngineEvent::WaterfallRow(WaterfallRow { bins, hz_per_col }));
+                }
+            }
+            if self.now() - last_tick >= 1000 {
+                last_tick = self.now();
+                self.emit(EngineEvent::Clock(last_tick));
+                if self.input.is_some() {
+                    let db = rms_dbfs(&self.accum.peek_recent(SAMPLE_RATE as usize / 2));
                     self.emit(EngineEvent::InputLevel(InputLevelEvent {
                         db,
                         silent: db <= SILENCE_DBFS,
                     }));
                 }
             }
-
-            // Decode runs on a clock shifted later by the capture-latency
-            // compensation, so the sliced slot aligns with the audio that has
-            // actually arrived in the buffer (UTC display + TX still use real `now`).
-            // We fire once per slot as soon as the 12.64 s waveform is captured
-            // (~13.2 s in) rather than at the 15 s boundary, so decodes land a slot
-            // earlier and the operator can reply on the next cycle (not skip one).
-            let corrected = now - self.rx_offset_ms;
-            let rx_slot_id = corrected.div_euclid(CYCLE_MS);
-            let into_rx_cycle = corrected.rem_euclid(CYCLE_MS);
-            if self.decoding && rx_slot_id != self.last_decoded_slot && into_rx_cycle >= DECODE_AT_MS
-            {
-                self.last_decoded_slot = rx_slot_id;
-                // The slot's audio so far = the most recent `into_rx_cycle` of it,
-                // front-aligned (signal at sample 0) with the tail zero-padded.
-                let elapsed = (into_rx_cycle * SAMPLE_RATE as i64 / 1000) as usize;
-                let slot = self.accum.take_slot_from_start(elapsed);
-                let _ = self.slot_tx.send(slot);
-            }
-
-            // Act on any decodes the worker has finished (off-loop DSP). This is
-            // where steady-state TX is driven: each slot's decodes advance the QSO
-            // and then `maybe_transmit` keys up if it's our turn. Immediate keying
-            // on an operator tap is handled separately, in the command handlers.
-            while let Ok(msgs) = self.dec_rx.try_recv() {
-                self.handle_decoded(msgs, slot_id);
-            }
-
-            // Drop PTT as soon as the TX waveform finishes clocking out (or a
-            // stalled device trips the deadline). Polling here — rather than
-            // blocking inside `transmit` — is what lets Stop TX take effect
-            // mid-transmission instead of at the end of the cycle.
-            if let Some(pb) = self.tx_playback.as_ref() {
-                if pb.is_done() || pb.timed_out() {
-                    self.finalize_tx();
-                }
-            }
-
-            // Live scrolling waterfall: one spectrum row per ~100 ms tick.
-            if self.decoding {
-                self.emit_waterfall_row();
-            }
-
             std::thread::sleep(Duration::from_millis(100));
         }
     }
 
-    /// Nudge the capture-latency compensation toward zeroing the decoded DT. The
-    /// FT8 network is NTP-synced, so the *median* DT of a slot's decodes is a robust
-    /// estimate of our own systematic timing error (clock residual + audio latency).
-    /// A slow EMA keeps it from chasing noise; persisted so DT is right at next launch.
-    fn calibrate_dt(&mut self, decoded: &[DecodedMessage]) {
-        // Need a few independent decodes for the median to be meaningful.
-        const MIN_DECODES: usize = 4;
-        const ALPHA: f64 = 0.6; // correction fraction applied per slot
-        const DEADBAND_MS: i64 = 60; // ignore tiny residuals to avoid jitter
-        const MAX_OFFSET_MS: i64 = 4_000;
-        if decoded.len() < MIN_DECODES {
-            return;
-        }
-
-        let mut dts: Vec<f32> = decoded.iter().map(|m| m.time_sec).collect();
-        dts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let median_dt_ms = (dts[dts.len() / 2] * 1000.0) as i64;
-        if median_dt_ms.abs() <= DEADBAND_MS {
-            return;
-        }
-
-        let adjusted = self.rx_offset_ms + (median_dt_ms as f64 * ALPHA).round() as i64;
-        let new_offset = adjusted.clamp(-MAX_OFFSET_MS, MAX_OFFSET_MS);
-        if new_offset == self.rx_offset_ms {
-            return;
-        }
-        self.rx_offset_ms = new_offset;
-        // No re-anchor needed: the decode trigger requires `into_rx_cycle >=
-        // DECODE_AT_MS`, and offset changes land early in the cycle (right after a
-        // decode is delivered), far below that threshold — so a shifted slot id
-        // can't spuriously re-fire the decode this cycle.
-        let _ = self.db.set_config("rx_offset_ms", &new_offset.to_string());
-        self.publish_clock_sync();
+    fn reset_decoder(&mut self) {
+        self.decoder = Decoder::new(self.config).expect("validated modem");
     }
 
-    /// Handle one slot's decodes (from the worker): publish them, advance the QSO
-    /// state machine, then key up if it's our turn this slot. Runs once per slot
-    /// (the decoder returns a batch — possibly empty — every cycle), so this is
-    /// what drives CQ/auto-sequence retransmits.
-    fn handle_decoded(&mut self, decoded: Vec<DecodedMessage>, slot_id: i64) {
-        self.publish_decodes(&decoded);
-        self.calibrate_dt(&decoded);
-
-        if let Some(QsoOutcome::Completed(record)) = self.qso.process_rx(&decoded) {
-            match self.db.insert_qso(&record) {
-                Ok(_) => self.emit(EngineEvent::QsoCompleted(record)),
-                Err(e) => self.emit(EngineEvent::Error(format!("log QSO failed: {e}"))),
-            }
-        }
-        self.maybe_transmit(slot_id);
-        self.publish_tx_state();
-    }
-
-    /// Key up this slot's QSO message if we're armed, it's our turn, and the
-    /// 12.64 s waveform still fits before the next boundary. Idempotent per slot
-    /// (`txed_slot` guard), so calling it from both `handle_decoded` and a command
-    /// handler in the same slot transmits at most once.
-    fn maybe_transmit(&mut self, slot_id: i64) {
-        if !self.qso.active {
+    fn start_transmit(&mut self, text: &str) {
+        if self.tx_playback.is_some() || self.ptt {
+            self.emit(EngineEvent::Error(
+                "Stop the current over and confirm PTT is off before sending another".into(),
+            ));
             return;
         }
-        let parity = slot_id.rem_euclid(2);
-        // Respect a locked alternation. Answering a CQ pins the parity to the
-        // operator's click slot (set in the command handler) so we always reply
-        // opposite the DX; a CQ / free-text start leaves it `None`, eligible in
-        // any slot, and locks on its first transmission below.
-        if matches!(self.tx_parity, Some(p) if p != parity) {
-            return;
-        }
-        if self.txed_slot == slot_id {
-            return;
-        }
-        // Too late in the cycle to start cleanly — wait for our next eligible
-        // slot rather than transmit a clipped, undecodable signal.
-        if self.now().rem_euclid(CYCLE_MS) > TX_LATEST_MS {
-            return;
-        }
-        self.tx_parity = Some(parity);
-        self.txed_slot = slot_id;
-        if let Some(msg) = self.qso.tx_message().map(|s| s.to_string()) {
-            self.start_transmit(&msg);
-        }
-    }
-
-    /// The TX slot index we're currently in, by real UTC.
-    fn cur_slot(&self) -> i64 {
-        self.now().div_euclid(CYCLE_MS)
-    }
-
-    /// Parity (0/1) of the slot we're currently in.
-    fn cur_parity(&self) -> i64 {
-        self.cur_slot().rem_euclid(2)
-    }
-
-    /// Begin transmitting `message`, returning immediately. Playback runs off the
-    /// loop (in `tx_playback`) so the engine keeps draining commands — that's what
-    /// makes Stop TX able to interrupt mid-transmission. PTT is dropped later, when
-    /// the run loop sees the playback finish (or on Stop TX).
-    fn start_transmit(&mut self, message: &str) {
-        // Never key a second transmission over a live one.
-        if self.tx_playback.is_some() {
-            return;
-        }
-        let signal = match crate::dsp::encode::generate_ft8(message, self.tx_audio_hz as f32, SAMPLE_RATE) {
-            Some(s) => s,
-            None => {
-                self.emit(EngineEvent::Error(format!("cannot encode '{message}'")));
-                return;
-            }
-        };
-
-        // Do the slow work — device open + full-buffer resample — BEFORE keying
-        // the rig, so PTT isn't held through it. On a weak CPU this resample is
-        // hundreds of ms; running it after PTT is what produced the long
-        // keyed-but-silent gap reported on the Inovato Quadra.
-        let mut prepared = match output::prepare(self.output_device.as_deref(), &signal, self.tx_gain) {
-            Ok(p) => p,
+        let message = match validate_tx(text, self.config) {
+            Ok(m) => m,
             Err(e) => {
-                self.emit(EngineEvent::Error(format!("playback failed: {e}")));
+                self.emit(EngineEvent::Error(e));
                 return;
             }
         };
-
-        // Key up, let the rig's T/R relay settle, then start clocking samples.
-        self.set_ptt(true);
+        let signal = match dsp::encode(&message, self.config) {
+            Ok(s) => s,
+            Err(e) => {
+                self.emit(EngineEvent::Error(e));
+                return;
+            }
+        };
+        // Open/resample BEFORE keying. No UTC slots or leading-audio clipping.
+        let mut prepared =
+            match output::prepare(self.output_device.as_deref(), &signal, self.tx_gain) {
+                Ok(p) => p,
+                Err(e) => {
+                    self.emit(EngineEvent::Error(format!("playback failed: {e}")));
+                    return;
+                }
+            };
+        if !self.set_ptt(true) {
+            self.set_ptt(false);
+            return;
+        }
         std::thread::sleep(Duration::from_millis(PTT_DELAY_MS));
-
-        // Clip leading audio only if we'd overrun the cycle (CLAUDE.md gotcha:
-        // ms_late = max(0, into_cycle - 2360), NOT into_cycle % 15000). Computed
-        // here, right before audio starts, so it reflects the real lateness after
-        // the PTT settle — `maybe_transmit`'s window check keeps this at 0 in
-        // normal operation.
-        let into_cycle = self.now().rem_euclid(CYCLE_MS);
-        let ms_late = (into_cycle - TX_SLACK_MS).max(0);
-        if let Err(e) = prepared.start(ms_late) {
+        if let Err(e) = prepared.start(0) {
             self.emit(EngineEvent::Error(format!("playback failed: {e}")));
             self.set_ptt(false);
             return;
         }
+        self.tx_message = Some(message);
         self.tx_playback = Some(prepared);
         self.publish_tx_state();
     }
 
-    /// Stop the in-flight transmission (if any): dropping the handle halts the
-    /// cpal stream immediately, then PTT goes down. Safe to call when not TXing.
-    fn finalize_tx(&mut self) {
-        if self.tx_playback.take().is_some() {
+    fn finalize_tx(&mut self) -> bool {
+        self.tx_playback.take(); // halt audio before releasing the old rig
+        if self.ptt {
             self.set_ptt(false);
-            self.publish_tx_state();
         }
+        self.tx_message = None;
+        self.accum.clear();
+        self.reset_decoder();
+        self.publish_tx_state();
+        !self.ptt
     }
 
-    fn set_ptt(&mut self, on: bool) {
+    fn set_ptt(&mut self, on: bool) -> bool {
+        // A failed key command may have reached the radio. Keep the possible
+        // keyed state until OFF succeeds, so Stop retries and rig changes block.
+        if on {
+            self.ptt = true;
+        }
         if let Some(rig) = self.rig.as_mut() {
             if let Err(e) = rig.set_ptt(on) {
-                self.emit(EngineEvent::Error(format!("PTT failed: {e}")));
+                self.emit(EngineEvent::Error(format!(
+                    "PTT failed: {e}; check the radio manually"
+                )));
+                self.publish_rig_status();
+                return false;
             }
         }
         self.ptt = on;
         self.publish_rig_status();
-    }
-
-    /// Compute one windowed-FFT spectrum row from the most recent audio and emit
-    /// it for the scrolling waterfall. Color is auto-scaled relative to a smoothed
-    /// noise-floor estimate so the floor stays blue regardless of input gain.
-    fn emit_waterfall_row(&mut self) {
-        let samples = self.accum.peek_recent(self.wf.samples_needed());
-        let Some((bins, hz_per_col)) = self.wf.process_row(&samples, SAMPLE_RATE as f32) else {
-            return; // still warming up
-        };
-        // Mark this row if it's the first at/after a cycle boundary on the same
-        // rx-corrected clock the decoder uses, so the grid line aligns with DT.
-        let boundary = wf_boundary_row(self.now() - self.rx_offset_ms, &mut self.last_wf_slot);
-        self.emit(EngineEvent::WaterfallRow(WaterfallRow { bins, hz_per_col, boundary }));
-    }
-
-    fn publish_decodes(&self, decoded: &[DecodedMessage]) {
-        let now = self.now();
-        let ui: Vec<UiMessage> = decoded
-            .iter()
-            .map(|m| UiMessage {
-                utc_ms: now,
-                call_to: m.call_to.clone(),
-                call_from: m.call_from.clone(),
-                extra: m.extra.clone(),
-                grid: m.grid.clone(),
-                snr: m.snr,
-                freq_hz: m.freq_hz,
-                time_sec: m.time_sec,
-                text: if m.raw_text.is_empty() {
-                    format!("{} {} {}", m.call_to, m.call_from, m.extra)
-                } else {
-                    m.raw_text.clone()
-                },
-                is_cq: m.call_to.eq_ignore_ascii_case("CQ"),
-                to_me: !self.qso.my_call.is_empty()
-                    && m.call_to.eq_ignore_ascii_case(&self.qso.my_call),
-            })
-            .collect();
-        self.emit(EngineEvent::Decoded(ui));
+        true
     }
 
     fn publish_tx_state(&self) {
         self.emit(EngineEvent::TxState(TxStateEvent {
-            // Derived from the live playback handle so the badge can't get stuck:
-            // it's TX exactly while a transmission is clocking out.
             transmitting: self.tx_playback.is_some(),
-            message: self.qso.tx_message().map(|s| s.to_string()),
-            status: self.qso.status(),
+            message: self.tx_message.clone(),
         }));
     }
 
     fn publish_rig_status(&self) {
-        let (connected, model) = match &self.rig {
-            Some(r) => (r.connected(), r.name()),
-            None => (false, "None".to_string()),
-        };
+        let (connected, model) = self
+            .rig
+            .as_ref()
+            .map(|r| (r.connected(), r.name()))
+            .unwrap_or((false, "None".into()));
         self.emit(EngineEvent::RigStatus(RigStatusEvent {
             connected,
             model,
@@ -713,234 +393,351 @@ impl Engine {
         self.emit(EngineEvent::ClockSync(ClockSyncEvent {
             offset_ms: self.clock_offset_ms,
             synced: self.time_synced,
-            rx_offset_ms: self.rx_offset_ms,
         }));
     }
 
-    fn emit(&self, e: EngineEvent) {
-        let _ = self.evt.send(e);
+    fn emit(&self, event: EngineEvent) {
+        let _ = self.evt.send(event);
     }
 
     fn handle(&mut self, cmd: EngineCommand) {
         match cmd {
             EngineCommand::StartDecode => self.start_decode(),
             EngineCommand::StopDecode => {
-                self.decoding = false;
                 self.input = None;
-                self.emit(EngineEvent::Info("decode stopped".into()));
+                self.accum.clear();
+                self.reset_decoder();
+                self.emit(EngineEvent::Decoding(false));
             }
             EngineCommand::SetStation { call, grid } => {
-                self.qso.my_call = call.to_uppercase();
-                self.qso.my_grid = util::grid4(&grid).to_uppercase();
-                let _ = self.db.set_config("my_call", &self.qso.my_call);
-                let _ = self.db.set_config("my_grid", &self.qso.my_grid);
+                let _ = self.db.set_config("my_call", &call.to_uppercase());
+                let _ = self.db.set_config("my_grid", &grid.to_uppercase());
             }
             EngineCommand::SetBand(hz) => {
+                if !self.finalize_tx() {
+                    self.publish_rig_status();
+                    return;
+                }
                 self.dial_hz = hz;
-                self.qso.band = bands::band_for_freq_hz(hz).to_string();
-                self.qso.freq_mhz = bands::freq_mhz_string(hz);
                 let _ = self.db.set_config("dial_hz", &hz.to_string());
                 if let Some(rig) = self.rig.as_mut() {
-                    let _ = rig.set_frequency(hz);
+                    if let Err(e) = rig.set_frequency(hz) {
+                        self.emit(EngineEvent::Error(format!("tuning failed: {e}")));
+                    }
                 }
                 self.publish_rig_status();
             }
-            EngineCommand::SetBaseFreq(hz) => {
-                self.tx_audio_hz = hz.clamp(200, 3000);
-                let _ = self.db.set_config("base_freq", &self.tx_audio_hz.to_string());
+            EngineCommand::SetModem(config) => {
+                if let Err(e) = config.validate().and_then(|_| {
+                    if config.sample_rate == SAMPLE_RATE {
+                        Ok(())
+                    } else {
+                        Err("Desktop audio requires 12000 Hz modem rate".into())
+                    }
+                }) {
+                    self.emit(EngineEvent::Error(e));
+                    self.emit(EngineEvent::Modem(self.config));
+                    return;
+                }
+                let only_tones = RttyConfig {
+                    mark_hz: config.mark_hz,
+                    ..self.config
+                } == config;
+                if only_tones && self.tx_playback.is_none() && !self.ptt {
+                    self.decoder.retune(config.mark_hz).expect("validated tone");
+                } else {
+                    if !self.finalize_tx() {
+                        self.emit(EngineEvent::Modem(self.config));
+                        return;
+                    }
+                    self.decoder = Decoder::new(config).expect("validated modem");
+                }
+                self.config = config;
+                let _ = self
+                    .db
+                    .set_config("rtty_modem", &serde_json::to_string(&config).unwrap());
+                self.emit(EngineEvent::Modem(config));
             }
-            EngineCommand::SetTxGain(g) => {
-                self.tx_gain = clamp_tx_gain(g);
+            EngineCommand::SetTxGain(gain) => {
+                self.tx_gain = clamp_tx_gain(gain);
                 let _ = self.db.set_config("tx_gain", &self.tx_gain.to_string());
             }
-            EngineCommand::SetWaterfallConfig(cfg) => {
-                let cfg = cfg.sanitize();
-                let _ = self.db.set_config("wf_window", cfg.window.as_str());
-                let _ = self.db.set_config("wf_fft_size", &cfg.fft_size.to_string());
-                let _ = self.db.set_config("wf_avg", &cfg.avg.to_string());
-                // Rebuild plan + window table; the noise-floor EMA restarts and
-                // reconverges within a couple of seconds.
-                self.wf = WfProcessor::new(cfg);
-                self.emit(EngineEvent::Info(format!(
-                    "waterfall: {} {} avg {}",
-                    cfg.window.as_str(),
-                    cfg.fft_size,
-                    cfg.avg
-                )));
-            }
             EngineCommand::SetInputDevice(name) => {
-                self.input_device = name.clone();
-                let _ = self.db.set_config("input_device", name.as_deref().unwrap_or(""));
-                if self.decoding {
-                    self.start_decode(); // restart capture on the new device
+                let running = self.input.is_some();
+                self.input = None;
+                self.input_device = name;
+                let _ = self
+                    .db
+                    .set_config("input_device", self.input_device.as_deref().unwrap_or(""));
+                if running {
+                    self.start_decode();
                 }
             }
             EngineCommand::SetOutputDevice(name) => {
-                self.output_device = name.clone();
-                let _ = self.db.set_config("output_device", name.as_deref().unwrap_or(""));
+                if !self.finalize_tx() {
+                    return;
+                }
+                self.output_device = name;
+                let _ = self
+                    .db
+                    .set_config("output_device", self.output_device.as_deref().unwrap_or(""));
             }
             EngineCommand::SelectRig(cfg) => {
-                if let Ok(json) = serde_json::to_string(&cfg) {
-                    let _ = self.db.set_config("rig_config", &json);
+                if !self.finalize_tx() {
+                    return;
                 }
+                let _ = self
+                    .db
+                    .set_config("rig_config", &serde_json::to_string(&cfg).unwrap());
                 self.select_rig(cfg);
             }
             EngineCommand::DisconnectRig => {
-                // Stop any in-flight TX and drop PTT *before* dropping the rig:
-                // set_ptt() only sends the CAT un-key when the rig is still
-                // connected, so tearing the transport down first could leave the
-                // radio keyed. Also stop CQ/QSO so we don't try to re-key a
-                // disconnected rig on the next slot.
-                self.qso.stop();
-                self.tx_parity = None;
-                self.finalize_tx();
-                self.publish_tx_state();
-                // Now drop the connection (runs the rig's close/cleanup); keep the
-                // saved config so reconnecting is one click away.
+                if !self.finalize_tx() {
+                    return;
+                }
                 self.rig = None;
-                self.ptt = false;
-                self.emit(EngineEvent::Info("rig disconnected".into()));
                 self.publish_rig_status();
             }
-            EngineCommand::StartCq => {
-                self.tx_parity = None;
-                self.qso.start_cq();
-                // Start CQ this very slot if we're still inside the window;
-                // otherwise the first transmission lands at the next free slot.
-                self.maybe_transmit(self.cur_slot());
-                self.publish_tx_state();
-            }
-            EngineCommand::Answer(args) => {
-                let msg = DecodedMessage {
-                    call_from: args.call_from,
-                    grid: args.grid,
-                    snr: args.snr,
-                    ..Default::default()
-                };
-                // Reply opposite the DX: the operator is clicking during the slot
-                // after the CQ, so pin TX to this slot's parity and key up right
-                // away if we're still inside the window — matching WSJT-X.
-                self.tx_parity = Some(self.cur_parity());
-                self.qso.answer(&msg);
-                self.maybe_transmit(self.cur_slot());
-                self.publish_tx_state();
-            }
-            EngineCommand::SetStage(stage) => {
-                self.tx_parity = None;
-                self.qso.set_stage(stage);
-                self.maybe_transmit(self.cur_slot());
-                self.publish_tx_state();
-            }
             EngineCommand::StopTx => {
-                self.qso.stop();
-                self.tx_parity = None;
-                // Halt audio + drop PTT now, not at the end of the cycle.
                 self.finalize_tx();
-                self.publish_tx_state();
             }
-            EngineCommand::FreeText(text) => {
-                self.tx_parity = None;
-                self.qso.set_free_text(&text);
-                self.maybe_transmit(self.cur_slot());
-                self.publish_tx_state();
-            }
+            EngineCommand::FreeText(text) => self.start_transmit(&text),
             EngineCommand::RefreshStatus => {
                 self.publish_rig_status();
                 self.publish_tx_state();
                 self.publish_clock_sync();
+                self.emit(EngineEvent::Modem(self.config));
+                self.emit(EngineEvent::Decoding(self.input.is_some()));
             }
-            EngineCommand::SetClockOffset(offset_ms) => {
-                self.clock_offset_ms = offset_ms;
+            EngineCommand::SetClockOffset(ms) => {
+                self.clock_offset_ms = ms;
                 self.time_synced = true;
-                let _ = self.db.set_config("clock_offset_ms", &offset_ms.to_string());
-                self.emit(EngineEvent::Info(format!(
-                    "time synced: clock offset {offset_ms:+} ms"
-                )));
+                let _ = self.db.set_config("clock_offset_ms", &ms.to_string());
                 self.publish_clock_sync();
             }
-            EngineCommand::ResyncTime => {
-                crate::timesync::spawn_once(self.cmd_tx.clone());
+            EngineCommand::ResyncTime => crate::timesync::spawn_once(self.cmd_tx.clone()),
+            EngineCommand::SetWaterfallConfig(cfg) => {
+                let cfg = cfg.sanitize();
+                let _ = self
+                    .db
+                    .set_config("waterfall", &serde_json::to_string(&cfg).unwrap());
+                self.wf = WfProcessor::new(cfg);
             }
-            EngineCommand::Shutdown => {}
+            EngineCommand::Shutdown => {
+                self.finalize_tx();
+            }
         }
     }
 
     fn start_decode(&mut self) {
+        self.input = None;
+        self.accum.clear();
+        self.reset_decoder();
         match AudioInput::start(self.input_device.as_deref(), self.accum.clone()) {
             Ok(input) => {
                 self.emit(EngineEvent::Info(format!(
-                    "capturing from '{}' @ {} Hz",
+                    "capturing '{}' @ {} Hz",
                     input.device_name, input.device_rate
                 )));
                 self.input = Some(input);
-                self.decoding = true;
             }
             Err(e) => self.emit(EngineEvent::Error(format!("audio start failed: {e}"))),
         }
+        self.emit(EngineEvent::Decoding(self.input.is_some()));
     }
 
-    fn select_rig(&mut self, cfg: RigConfig) {
-        // Close any existing connection FIRST. Some CAT servers (notably
-        // SmartSDR CAT) accept only one client, so opening the new session while
-        // the old one is still open makes the new handshake time out. Dropping
-        // here runs the old rig's close/cleanup before we reconnect.
+    fn select_rig(&mut self, config: RigConfig) {
         self.rig = None;
-        match RigConnection::connect(&cfg) {
+        match RigConnection::connect(&config) {
             Ok(mut rig) => {
-                let _ = rig.set_frequency(self.dial_hz);
+                if let Err(e) = rig.set_frequency(self.dial_hz) {
+                    self.emit(EngineEvent::Error(format!("tuning failed: {e}")));
+                }
                 self.rig = Some(rig);
-                self.emit(EngineEvent::Info(format!("rig connected: {:?}", cfg.model)));
             }
-            Err(e) => {
-                self.rig = None;
-                self.emit(EngineEvent::Error(format!("rig connect failed: {e}")));
-            }
+            Err(e) => self.emit(EngineEvent::Error(format!("rig connect failed: {e}"))),
         }
         self.publish_rig_status();
     }
 }
 
+impl Drop for Engine {
+    fn drop(&mut self) {
+        self.finalize_tx();
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{clamp_tx_gain, rms_dbfs, wf_boundary_row, CYCLE_MS, SILENCE_DBFS};
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     #[test]
-    fn rms_dbfs_flags_silence_and_signal() {
-        // Digital silence floors well below the silence threshold (not -inf).
-        let silence = vec![0.0f32; 6000];
-        let db_silent = rms_dbfs(&silence);
-        assert!(db_silent.is_finite());
-        assert!(db_silent <= SILENCE_DBFS, "silence {db_silent} should be ≤ {SILENCE_DBFS}");
-
-        // Empty buffer is treated as silence, never a panic or -inf.
-        assert!(rms_dbfs(&[]) <= SILENCE_DBFS);
-
-        // A half-scale full-amplitude square wave is ~ -6 dBFS — clearly "audio".
-        let signal = vec![0.5f32; 6000];
-        let db_signal = rms_dbfs(&signal);
-        assert!((db_signal - -6.02).abs() < 0.1, "0.5 RMS should be ~-6 dBFS, got {db_signal}");
-        assert!(db_signal > SILENCE_DBFS);
+    fn shutdown_waits_for_prior_commands_and_receiver_cleanup() {
+        let db = Arc::new(Db::open_in_memory().unwrap());
+        let (engine, events) = spawn(db.clone());
+        engine.send(EngineCommand::SetStation {
+            call: "ks3ckc".into(),
+            grid: "fn20".into(),
+        });
+        engine.shutdown();
+        engine.shutdown(); // closing an already stopped engine is harmless
+        assert_eq!(db.get_config("my_call").as_deref(), Some("KS3CKC"));
+        assert!(events
+            .try_iter()
+            .any(|e| matches!(e, EngineEvent::TxState(s) if !s.transmitting)));
     }
 
     #[test]
-    fn tx_gain_clamps_to_unit_range() {
-        assert_eq!(clamp_tx_gain(0.5), 0.5); // in range, untouched
-        assert_eq!(clamp_tx_gain(1.4), 1.0); // never overdrives past full scale
-        assert_eq!(clamp_tx_gain(-0.2), 0.0); // never negative (phase flip / garbage)
+    fn modem_commands_persist_valid_settings_and_reject_invalid_settings() {
+        let db = Arc::new(Db::open_in_memory().unwrap());
+        let (evt, rx) = std::sync::mpsc::channel();
+        let (cmd, _) = std::sync::mpsc::channel();
+        let mut engine = Engine::new(db.clone(), evt, cmd);
+        let config = RttyConfig {
+            baud_rate: 75.0,
+            shift_hz: 425.0,
+            reverse: true,
+            ..Default::default()
+        };
+        engine.handle(EngineCommand::SetModem(config));
+        assert_eq!(
+            serde_json::from_str::<RttyConfig>(&db.get_config("rtty_modem").unwrap()).unwrap(),
+            config
+        );
+        assert!(rx
+            .try_iter()
+            .any(|e| matches!(e, EngineEvent::Modem(c) if c == config)));
+        let signal = dsp::encode("12", config).unwrap();
+        let split = ((16.0 + 3.0 * 7.5) * config.samples_per_bit()).round() as usize;
+        assert_eq!(engine.decoder.process(&signal[..split]), "1");
+        engine.handle(EngineCommand::SetModem(config));
+        assert_eq!(
+            engine.decoder.process(&signal[split..]),
+            "2",
+            "retuning must retain FIGS state"
+        );
+        engine.handle(EngineCommand::SetModem(RttyConfig {
+            sample_rate: 48000,
+            ..config
+        }));
+        let events: Vec<_> = rx.try_iter().collect();
+        assert!(events.iter().any(|e| matches!(e, EngineEvent::Error(_))));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, EngineEvent::Modem(c) if *c == config)));
+        engine.handle(EngineCommand::FreeText("@@@".into()));
+        assert!(rx.try_iter().any(|e| matches!(e, EngineEvent::Error(_))));
+        engine.handle(EngineCommand::RefreshStatus);
+        assert!(rx
+            .try_iter()
+            .any(|e| matches!(e, EngineEvent::TxState(s) if !s.transmitting)));
     }
 
     #[test]
-    fn wf_boundary_fires_once_per_cycle() {
-        let mut last = -1;
-        // First call always marks (initial slot differs from the -1 sentinel).
-        assert!(wf_boundary_row(0, &mut last));
-        // Subsequent rows within the same 15 s slot do not re-mark.
-        assert!(!wf_boundary_row(100, &mut last));
-        assert!(!wf_boundary_row(CYCLE_MS - 1, &mut last));
-        // Crossing into the next slot marks exactly once.
-        assert!(wf_boundary_row(CYCLE_MS, &mut last));
-        assert!(!wf_boundary_row(CYCLE_MS + 500, &mut last));
-        // And again at the following boundary.
-        assert!(wf_boundary_row(2 * CYCLE_MS + 10, &mut last));
+    fn uncertain_ptt_blocks_rig_changes_until_stop_successfully_unkeys() {
+        // A local XML-RPC peer models a key command whose acknowledgement is
+        // lost. This tests software fault handling, not a physical radio.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let failing = Arc::new(AtomicBool::new(false));
+        let keyed = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
+        let (fail_peer, key_peer, stop_peer) = (failing.clone(), keyed.clone(), stop.clone());
+        let peer = std::thread::spawn(move || {
+            while !stop_peer.load(Ordering::SeqCst) {
+                let Ok((mut stream, _)) = listener.accept() else {
+                    std::thread::sleep(Duration::from_millis(2));
+                    continue;
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                let mut request = Vec::new();
+                let mut bytes = [0; 4096];
+                loop {
+                    let n = stream.read(&mut bytes).unwrap();
+                    if n == 0 {
+                        break;
+                    }
+                    request.extend_from_slice(&bytes[..n]);
+                    if request.windows(13).any(|w| w == b"</methodCall>") {
+                        break;
+                    }
+                }
+                let request = String::from_utf8(request).unwrap();
+                let fail = fail_peer.load(Ordering::SeqCst);
+                if request.contains("rig.set_ptt") {
+                    if request.contains("<i4>1</i4>") {
+                        key_peer.store(true, Ordering::SeqCst);
+                    } else if !fail {
+                        key_peer.store(false, Ordering::SeqCst);
+                    }
+                }
+                let status = if fail {
+                    "500 Internal Server Error"
+                } else {
+                    "200 OK"
+                };
+                let body = "<methodResponse><params><param><value>Test peer</value></param></params></methodResponse>";
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+            }
+        });
+        let db = Arc::new(Db::open_in_memory().unwrap());
+        let (evt, rx) = std::sync::mpsc::channel();
+        let (cmd, _) = std::sync::mpsc::channel();
+        let mut engine = Engine::new(db.clone(), evt, cmd);
+        let config: RigConfig =
+            serde_json::from_str(&format!(r#"{{"backend":"flrig","flrig_port":{port}}}"#)).unwrap();
+        engine.handle(EngineCommand::SelectRig(config));
+        failing.store(true, Ordering::SeqCst);
+        assert!(!engine.set_ptt(true));
+        assert!(keyed.load(Ordering::SeqCst));
+        engine.handle(EngineCommand::DisconnectRig);
+        engine.handle(EngineCommand::SetOutputDevice(Some(
+            "must not persist".into(),
+        )));
+        engine.handle(EngineCommand::RefreshStatus);
+        assert!(rx
+            .try_iter()
+            .any(|e| matches!(e, EngineEvent::RigStatus(s) if s.ptt)));
+        assert_eq!(db.get_config("output_device"), None);
+        failing.store(false, Ordering::SeqCst);
+        engine.handle(EngineCommand::StopTx);
+        assert!(!keyed.load(Ordering::SeqCst));
+        engine.handle(EngineCommand::DisconnectRig);
+        assert!(rx
+            .try_iter()
+            .any(|e| matches!(e, EngineEvent::RigStatus(s) if !s.ptt && !s.connected)));
+        drop(engine);
+        stop.store(true, Ordering::SeqCst);
+        peer.join().unwrap();
+    }
+
+    #[test]
+    fn manual_over_is_framed_and_invalid_text_never_keys() {
+        assert_eq!(
+            validate_tx("  cq K1ABC 599  ", RttyConfig::default()).unwrap(),
+            " cq K1ABC 599\r\n"
+        );
+        for text in ["", "  ", "@@@", &"A".repeat(1001)] {
+            assert!(validate_tx(text, RttyConfig::default()).is_err());
+        }
+    }
+    #[test]
+    fn signal_and_gain_remain_finite() {
+        assert_eq!(rms_dbfs(&[]), -120.0);
+        assert!(rms_dbfs(&[0.0; 100]) <= SILENCE_DBFS);
+        assert!((rms_dbfs(&[0.5; 100]) + 6.0206).abs() < 0.001);
+        assert_eq!(clamp_tx_gain(f32::NAN), 0.0);
+        assert_eq!(clamp_tx_gain(-1.0), 0.0);
+        assert_eq!(clamp_tx_gain(2.0), 1.0);
     }
 }

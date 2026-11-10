@@ -142,7 +142,6 @@ pub fn list_serial_ports() -> Vec<SerialPortInfo> {
 
 trait RigTransport: Send {
     fn set_frequency(&mut self, hz: u64) -> anyhow::Result<()>;
-    fn set_data_mode(&mut self) -> anyhow::Result<()>;
     fn set_ptt(&mut self, on: bool) -> anyhow::Result<()>;
     /// Human-readable radio model for the UI (e.g. "FlexRadio 6400"), not the
     /// backend name — resolved per-backend at connect time.
@@ -164,16 +163,13 @@ impl RigConnection {
             RigBackend::Hamlib => Box::new(Hamlib::connect(cfg)?),
         };
         let mut conn = RigConnection { inner };
-        let _ = conn.set_ptt(false);
-        let _ = conn.set_data_mode();
+        conn.set_ptt(false)?;
+        // Preserve the operator's LSB/USB choice; polarity is a modem setting.
         Ok(conn)
     }
 
     pub fn set_frequency(&mut self, hz: u64) -> anyhow::Result<()> {
         self.inner.set_frequency(hz)
-    }
-    pub fn set_data_mode(&mut self) -> anyhow::Result<()> {
-        self.inner.set_data_mode()
     }
     pub fn set_ptt(&mut self, on: bool) -> anyhow::Result<()> {
         self.inner.set_ptt(on)
@@ -193,9 +189,6 @@ impl RigTransport for NullTransport {
     fn set_frequency(&mut self, _hz: u64) -> anyhow::Result<()> {
         Ok(())
     }
-    fn set_data_mode(&mut self) -> anyhow::Result<()> {
-        Ok(())
-    }
     fn set_ptt(&mut self, _on: bool) -> anyhow::Result<()> {
         Ok(())
     }
@@ -213,7 +206,6 @@ impl RigTransport for NullTransport {
 
 trait Driver: Send {
     fn freq_cmd(&self, hz: u64) -> Vec<u8>;
-    fn data_mode_cmd(&self) -> Vec<u8>;
     fn ptt_cmd(&self, on: bool) -> Vec<u8>;
 }
 
@@ -221,9 +213,6 @@ struct Yaesu;
 impl Driver for Yaesu {
     fn freq_cmd(&self, hz: u64) -> Vec<u8> {
         format!("FA{:09};", hz).into_bytes()
-    }
-    fn data_mode_cmd(&self) -> Vec<u8> {
-        b"MD0C;NA00;SH0117;".to_vec()
     }
     fn ptt_cmd(&self, on: bool) -> Vec<u8> {
         if on { b"TX1;".to_vec() } else { b"TX0;".to_vec() }
@@ -234,9 +223,6 @@ struct Kenwood;
 impl Driver for Kenwood {
     fn freq_cmd(&self, hz: u64) -> Vec<u8> {
         format!("FA{:011};", hz).into_bytes()
-    }
-    fn data_mode_cmd(&self) -> Vec<u8> {
-        b"MD2;".to_vec()
     }
     fn ptt_cmd(&self, on: bool) -> Vec<u8> {
         if on { b"TX;".to_vec() } else { b"RX;".to_vec() }
@@ -272,9 +258,6 @@ impl Driver for Icom {
         let mut body = vec![0x05];
         body.extend_from_slice(&Self::freq_bcd(hz));
         self.frame(&body)
-    }
-    fn data_mode_cmd(&self) -> Vec<u8> {
-        self.frame(&[0x26, 0x00, 0x01, 0x01, 0x01])
     }
     fn ptt_cmd(&self, on: bool) -> Vec<u8> {
         self.frame(&[0x1C, 0x00, if on { 0x01 } else { 0x00 }])
@@ -317,10 +300,6 @@ impl SerialCat {
 impl RigTransport for SerialCat {
     fn set_frequency(&mut self, hz: u64) -> anyhow::Result<()> {
         let cmd = self.driver.freq_cmd(hz);
-        self.send(&cmd)
-    }
-    fn set_data_mode(&mut self) -> anyhow::Result<()> {
-        let cmd = self.driver.data_mode_cmd();
         self.send(&cmd)
     }
     fn set_ptt(&mut self, on: bool) -> anyhow::Result<()> {
@@ -419,11 +398,6 @@ fn int_param(v: i32) -> String {
 impl RigTransport for Flrig {
     fn set_frequency(&mut self, hz: u64) -> anyhow::Result<()> {
         self.call("rig.set_frequency", &double_param(hz as f64))?;
-        Ok(())
-    }
-    fn set_data_mode(&mut self) -> anyhow::Result<()> {
-        // Leave the mode to FLrig/the operator — forcing a mode string here would
-        // fight per-rig naming (USB vs DATA-U vs PKT-U). FT8 only needs freq + PTT.
         Ok(())
     }
     fn set_ptt(&mut self, on: bool) -> anyhow::Result<()> {
@@ -643,10 +617,6 @@ impl RigTransport for Hamlib {
             self.connected = false;
             anyhow::bail!("rig_set_freq failed (Hamlib error {rc})");
         }
-        Ok(())
-    }
-    fn set_data_mode(&mut self) -> anyhow::Result<()> {
-        // Leave the mode to the operator/Hamlib config; FT8 needs only freq + PTT.
         Ok(())
     }
     fn set_ptt(&mut self, on: bool) -> anyhow::Result<()> {

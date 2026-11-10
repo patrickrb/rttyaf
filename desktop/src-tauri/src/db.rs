@@ -43,7 +43,7 @@ pub struct QsoRecord {
 }
 
 fn default_mode() -> String {
-    "FT8".to_string()
+    "RTTY".to_string()
 }
 
 pub struct Db {
@@ -196,7 +196,7 @@ impl Db {
 
     /// Export the whole log as an ADIF string, matching ShareLogs' field set/order.
     pub fn export_adif(&self) -> String {
-        let mut out = String::from("FT8AF ADIF Export<eoh>\n");
+        let mut out = String::from("RTTYAF ADIF Export<eoh>\n");
         for r in self.list_qsos(i64::MAX, 0).into_iter().rev() {
             out.push_str(&adif_field("call", &r.call));
             out.push_str("<QSL_RCVD:1>N <QSL_MANUAL:1>N ");
@@ -258,9 +258,9 @@ mod tests {
         let rec = QsoRecord {
             call: "K1ABC".into(),
             gridsquare: "FN42".into(),
-            mode: "FT8".into(),
-            rst_sent: "-12".into(),
-            rst_rcvd: "-08".into(),
+            mode: default_mode(),
+            rst_sent: "599".into(),
+            rst_rcvd: "579".into(),
             qso_date: "20260604".into(),
             time_on: "123045".into(),
             band: "20m".into(),
@@ -274,7 +274,8 @@ mod tests {
         assert_eq!(db.count(), 1);
 
         let adif = db.export_adif();
-        assert!(adif.starts_with("FT8AF ADIF Export<eoh>\n"));
+        assert!(adif.starts_with("RTTYAF ADIF Export<eoh>\n"));
+        assert!(adif.contains("<mode:4>RTTY "));
         assert!(adif.contains("<call:5>K1ABC "));
         assert!(adif.contains("<gridsquare:4>FN42 "));
         assert!(adif.contains("<band:3>20m "));
