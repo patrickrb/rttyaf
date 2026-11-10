@@ -18,7 +18,7 @@ Setup is noninteractive and repeatable, and installs:
 The SDK is shared by worktrees at `~/.local/share/android-sdk`; Gradle uses
 `~/.gradle`. Allow several GB of disk and a few minutes for cold downloads.
 The setup log lists each phase. A warm run reuses installed SDK packages and
-Gradle caches. It doesn't download an emulator, install desktop/iOS toolchains,
+Gradle caches. It doesn't download an emulator, install desktop toolchains,
 start services, change tracked files, or need release secrets.
 
 Environment exports are persisted in `~/.config/rttyaf/env.sh`, loaded once per
@@ -78,12 +78,13 @@ core test suite.
 
 ## Internal testing boundary for this rollout
 
-Do not merge this integration to `main`: although Android's main lane publishes
-to Play internal, the desktop workflow also creates a **production** desktop
-release on every main push. Use the
+Main pushes publish Android to Play internal and desktop as a
+`desktop-dev.*` prerelease. These are internal-testing lanes, not production
+authorization. Preserve required review and obtain owner authorization before
+merging; do not merge merely to test a workflow. Alternatively use the
 [reviewed feature-ref INTERNAL dispatch](release-pipeline.md#reviewed-feature-ref-internal-delivery)
 only after the exact head commit has independent human approval and normal CI /
-protection gates pass. Keep the PR unmerged; while blocked, distribute the debug
+protection gates pass. While blocked, distribute the debug
 APK and report the blocker. Do not change protections or bypass human review.
 No production release, production tag or promotion is authorized until Patrick
 tests all five apps (FT8AF, RTTYAF, SSTVAF, ROTA, JTTYAF) and explicitly approves.
@@ -136,9 +137,7 @@ npm run build
 ```
 
 This only checks TypeScript and bundles the frontend; it does **not** validate
-the native app. `desktop/src-tauri/build.rs` and iOS C shims still reference the
-removed `ft8af/app/src/main/cpp` FT8 DSP sources. Their native build/test commands
-are not currently usable from a fresh clone. Restoring/porting those products
-is separate work, not a prerequisite for Android development. The old FT8
-claims in their READMEs are historical, not the active RTTY build contract.
-iOS app validation also needs macOS/Xcode, unavailable in Linux orbs.
+the native app. The desktop app now uses a Rust RTTY modem; follow
+`desktop/README.md` for native dependencies, tests and builds. iOS is not a
+supported target. Its legacy FT8 app, kit, demo, dangling native-header symlinks
+and CI workflow have been removed; no Swift RTTY port or iOS release is planned.

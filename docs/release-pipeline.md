@@ -1,10 +1,11 @@
 # Release pipeline
 
 > **Shared-core rollout: internal testing only.** Do not merge to `main` as an
-> internal-only delivery shortcut: the existing desktop workflow unconditionally
-> creates a non-prerelease `desktop-v*` release on main pushes, even when no
-> desktop files changed. Use the reviewed feature-ref INTERNAL dispatch below;
-> while blocked, provide a test APK. No production release, promotion or rollout until Patrick tests
+> unreviewed delivery shortcut. Main pushes publish Android to Play internal and
+> desktop as `desktop-dev.*` prereleases, even for docs-only merges. Preserve
+> required review and obtain owner authorization before merging, or use the
+> reviewed feature-ref INTERNAL dispatch below; while blocked, provide a test APK.
+> No production release, promotion or rollout until Patrick tests
 > **all five apps** (FT8AF, RTTYAF, SSTVAF, ROTA, JTTYAF) and explicitly approves.
 > Do not change protections/environments or bypass human review to deliver it.
 
@@ -53,7 +54,7 @@ owner-approved external protection/credential boundary; do not invent one here.
    has not dismissed approval or requested changes. No track/status inputs exist:
    dispatch always selects **internal**, **completed**, and a GitHub **prerelease**
    `android-dev.<run#>` at the built SHA. That tag and feature pushes do not match
-   desktop/iOS publishing triggers. If GitHub refuses feature-ref dispatch because
+   desktop publishing triggers. If GitHub refuses feature-ref dispatch because
    default-branch registration is insufficient, report the exact response and
    stop; do not merge main or bootstrap a bypass. Existing Android workflow
    registration is visible in `gh workflow list` but is not proof of successful
@@ -96,11 +97,10 @@ Credential-free safeguard validation:
 uv run --with PyYAML python -m unittest discover -s .github/scripts -p 'test_*.py' -v
 ```
 
-Three platforms (Android, desktop, iOS) build and release **independently** —
-each has its own workflow, its own path filter, its own tag namespace, and its
-own required status-check gate. A change to one platform never rebuilds the
-others (except a change to the shared native C core under
-`rttyaf/app/src/main/cpp/**`, which all three depend on).
+Android and desktop build and release **independently**, with separate workflows,
+path filters, tag namespaces and status-check gates. PRs use those path filters;
+main pushes always build/release both internal snapshots. iOS is not a supported
+target; its legacy FT8 app, kit, demo and CI workflow have been retired.
 
 ## Branch lifecycle
 
@@ -130,27 +130,40 @@ Per-platform prefixes keep the Releases page unambiguous:
 | Platform | Production tag        | Internal (prerelease) tag | Trigger of internal build |
 |----------|-----------------------|---------------------------|---------------------------|
 | Android  | `android-v<x.y>`      | `android-dev.<run#>`      | push to `main`            |
-| Desktop  | `desktop-v<x.y.z>`    | `desktop-dev.<run#>`      | _(dormant — was `staging`)_ |
-| iOS      | _(no release yet)_    | _(no release yet)_        | —                         |
+| Desktop  | `desktop-v<x.y.z>`    | `desktop-dev.<run#>`      | push to `main` or `staging` |
 
-- Desktop **production** releases also auto-bump `desktop-v*` on every push to
-  `main`; the dormant staging prerelease lane does not make main internal-only.
+- Desktop main/staging pushes create **prereleases**, never `desktop-v*` tags.
+  Only an explicit `desktop-v*` tag push selects desktop production; it remains
+  unauthorized during the all-five-app hold.
 - Android internal builds derive their versionName from the latest
   `android-v*` tag (e.g. `1.2.1-dev.42`); until the first such tag exists the
   workflow falls back to the static versionName in `rttyaf/app/build.gradle`.
-- The desktop workflow still carries FT8AF's staging lane; since no `staging`
-  branch exists it never fires — `main` pushes and `desktop-v*` tags are the
-  only live desktop lanes.
-- iOS is CI-only: it builds the test suite and an unsigned simulator build to
-  prove it compiles. A distributable `.ipa` needs an Apple Developer cert +
-  provisioning profile / TestFlight, which are not wired up yet.
+- The desktop workflow still accepts staging pushes; no `staging` branch
+  currently exists. Do not create branches or tags to trigger release lanes.
+
+## Release-notes API audit
+
+RTTYAF currently has **no Anthropic API calls** in its release workflows or
+scripts, including the `release/1.2.0-notes` and `release/1.2.1-notes` branches
+audited on November 10, 2026. Android's `generate_release_notes: true` is GitHub's
+release-note generation, not a paid model call. Desktop uses a deterministic
+release body, and Play uses checked-in `distribution/whatsnew` text. There is
+no paid first-internal call to remove or repeated paid call to deduplicate.
+No release automation was changed for this audit.
 
 ## One-time setup (manual)
 
 These cannot be done from a workflow file:
 
 1. **Branch protection for `main`** → Require status checks → `android-gate`
-   (plus `desktop-gate` / `ios-gate` as desired). The FT8AF source gates
+   (plus `desktop-gate` as desired). Before merging the iOS-removal PR, Patrick
+   must inspect effective classic protections and rulesets for `main` and retire
+   the `ios-gate` requirement if present. The removed workflow also targeted
+   `dev`/`staging`; neither branch currently exists, but matching wildcard
+   rulesets/protections must not require `ios-gate` if those branches return.
+   Classic protection GET returned 403; visible rules/rulesets were empty, so
+   this audit cannot certify the check is optional. No protection changes or
+   fake green replacement gate are part of the PR. The FT8AF source gates
    (`enforce-source-is-dev` / `enforce-source-is-staging`) are gone — remove
    them if they linger as required checks.
 2. **Play Console** → the app `radio.ks3ckc.rttyaf` must exist with its

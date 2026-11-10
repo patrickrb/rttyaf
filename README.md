@@ -57,7 +57,7 @@ Installing the resulting debug APK requires a connected Android device; see the 
 
 The RTTY modem is pure Kotlin in [`rttyaf/app/src/main/kotlin/radio/ks3ckc/rttyaf/rtty/`](rttyaf/app/src/main/kotlin/radio/ks3ckc/rttyaf/rtty/). Native code in [`rttyaf/app/src/main/cpp/`](rttyaf/app/src/main/cpp/) is the libusb/JNI USB audio bridge, built from source with NDK/CMake into `librttyaf.so`. Fresh clones and worktrees need no prebuilt library copying.
 
-The former FT8 DSP core and `libft8cn.so` are no longer part of the Android app. The legacy desktop/iOS FT8 ports still reference removed sources; see the [documented limitations](docs/development.md#legacy-ports-and-boundaries) before working on them.
+The former FT8 DSP core and `libft8cn.so` are no longer part of the Android app. The [desktop app](desktop/README.md) uses a Rust RTTY modem. iOS is not a supported target; the leftover FT8 iOS app, kit, demo and CI have been retired. See the [platform boundaries](docs/development.md#legacy-ports-and-boundaries).
 
 ---
 

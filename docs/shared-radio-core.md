@@ -46,8 +46,10 @@ between core and app rather than duplicated.
 APK inspection confirmed all four core class descriptors, no old app-local class
 descriptors, and `librttyaf.so` for arm64-v8a, armeabi-v7a, x86, and x86_64.
 The current CMake build contains libusb + USB audio JNI only; no native host test
-suite remains in this baseline. Inherited desktop/iOS FT8 suites reference removed
-sources and were not run. No Android device was attached (`adb devices` returned
+suite remains in this baseline. At this historical baseline, inherited desktop
+and iOS FT8 suites referenced removed sources and were not run. Desktop has since
+been ported to RTTY; the unsupported iOS footprint and CI have been retired.
+No Android device was attached (`adb devices` returned
 an empty list), so installation, connected tests, and physical USB/CAT/PTT behavior
 were not verified. Existing resource-format/deprecation warnings did not fail the
 build; no UI appearance changes were made.
@@ -104,8 +106,10 @@ build-only. Readiness rejects missing app/core reports, all-skipped core tests,
 failures in either module and a missing APK. Core-only PRs trigger readiness and
 its downloadable debug APK artifact. Release automation was not changed.
 
-**Internal testing only:** do not merge to main (desktop production side effect)
-or push release tags. All five apps must be tested by the user before explicit
+**Current internal-testing boundary:** main now selects a desktop prerelease,
+not the production side effect recorded above. Preserve required review and
+obtain owner authorization before merging; do not push production tags.
+All five apps must be tested by the user before explicit
 production approval. No device was attached; installation, instrumentation and
 physical USB/CAT/PTT/RF tests were not performed. See
 [development guidance](development.md#internal-testing-boundary-for-this-rollout)
