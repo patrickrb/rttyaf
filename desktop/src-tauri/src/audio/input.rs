@@ -1,5 +1,5 @@
 //! Continuous audio capture: open an input device, downmix to mono, resample to
-//! 12 kHz on a worker thread, and feed a `SlotAccumulator`.
+//! 12 kHz on a worker thread, and feed a `CaptureBuffer`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -12,7 +12,7 @@ use ringbuf::HeapRb;
 
 use super::devices::find_input_device;
 use super::resample::MonoResampler;
-use super::slot::SlotAccumulator;
+use super::slot::CaptureBuffer;
 use crate::dsp::SAMPLE_RATE;
 
 /// An active capture session. Dropping it stops capture.
@@ -27,7 +27,7 @@ pub struct AudioInput {
 impl AudioInput {
     pub fn start(
         device_name: Option<&str>,
-        accum: Arc<SlotAccumulator>,
+        accum: Arc<CaptureBuffer>,
     ) -> anyhow::Result<AudioInput> {
         let device = find_input_device(device_name)
             .ok_or_else(|| anyhow::anyhow!("no input audio device available"))?;
@@ -69,11 +69,11 @@ impl AudioInput {
         };
         stream.play()?;
 
-        // Resampling worker: device_rate mono -> 12 kHz -> SlotAccumulator.
+        // Resampling worker: device_rate mono -> 12 kHz -> CaptureBuffer.
         let stop = Arc::new(AtomicBool::new(false));
         let stop_w = stop.clone();
         let worker = std::thread::Builder::new()
-            .name("ft8af-audio-resample".into())
+            .name("rttyaf-audio-resample".into())
             .spawn(move || {
                 let mut resampler = MonoResampler::new(device_rate, SAMPLE_RATE as u32);
                 let mut scratch = vec![0.0f32; 4096];

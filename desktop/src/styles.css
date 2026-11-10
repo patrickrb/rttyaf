@@ -39,13 +39,18 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.danger { background: var(--tx); border-color: var(--tx); color: #fff; }
 button:disabled { opacity: 0.5; cursor: default; }
 
-select, input {
+select, input, textarea {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 13px;
+}
+select {
+  appearance: none;
+  background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23d7e0e8' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 7px center;
+  padding-right: 25px;
 }
 
 .topbar {
@@ -55,14 +60,12 @@ select, input {
   padding: 10px 14px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
 }
 .topbar .spacer { flex: 1; }
 .brand { font-weight: 700; letter-spacing: 0.5px; color: var(--accent); }
 
 .clock { font-variant-numeric: tabular-nums; font-size: 18px; }
-.cycle-bar { width: 160px; height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
-.cycle-bar > div { height: 100%; background: var(--accent); transition: width 0.2s linear; }
-.seq { color: var(--muted); }
 .tx-level { display: inline-flex; align-items: center; gap: 6px; }
 .tx-level input[type="range"] { margin: 0; }
 
@@ -70,38 +73,33 @@ select, input {
 .tabs button { border-bottom: none; border-radius: 6px 6px 0 0; }
 .tabs button.active { background: var(--bg); border-color: var(--border); color: var(--accent); }
 
-.content { flex: 1; overflow: auto; padding: 14px; }
+.content { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
 
-/* Decode tab: keep the waterfall + filter chips pinned, scroll only the table. */
+/* Keep waterfall and modem controls visible above the streaming text. */
 .content.decode { overflow: hidden; display: flex; flex-direction: column; }
-.content.decode .decode-list { flex: 1; overflow: auto; min-height: 0; }
+.waterfall { flex-shrink: 0; }
+.rx-text { flex: 1; min-height: 80px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 14px; color: #a3e6b1; font: 16px/1.6 monospace; }
+.modem-controls { flex-wrap: wrap; }
+.modem-controls input[type="number"] { width: 85px; }
+.modem-controls input:not([type="checkbox"]) { max-width: 150px; }
+.modem-controls label { white-space: nowrap; }
+textarea { resize: vertical; font-family: monospace; }
 
 .row { display: flex; align-items: center; gap: 10px; }
 .col { display: flex; flex-direction: column; gap: 8px; }
 .field label { display: block; color: var(--muted); margin-bottom: 3px; }
 
-.chips { display: flex; gap: 6px; margin-bottom: 8px; }
-.chip { padding: 4px 10px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; }
-.chip.active { background: var(--accent); color: #04121f; border-color: var(--accent); }
 
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--bg); }
-tr.time-sep td { border-top: 2px solid #34618f; color: var(--muted); font-size: 11px; padding: 2px 8px; background: #131a21; font-variant-numeric: tabular-nums; }
-tr.cq td { color: #7ed492; }
-tr.tome td { background: rgba(184,134,11,0.15); }
-tr.clickable { cursor: pointer; }
-tr.clickable:hover td { background: #1d2730; }
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
 .panel h3 { margin: 0 0 10px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
 .txbar { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: var(--panel-2); border-top: 1px solid var(--border); }
 .txbar .msg { font-family: "Cascadia Code", monospace; }
-.stage-picker { display: flex; gap: 4px; }
-.stage-picker button { padding: 4px 10px; font-size: 12px; font-weight: 600; }
-.stage-picker button.active { background: var(--tx); color: #fff; border-color: var(--tx); }
-.stage-picker button:disabled { opacity: 0.4; cursor: not-allowed; }
+.txbar .col { min-width: 0; }
 .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
 .badge.tx { background: var(--tx); color: #fff; }
 .badge.rx { background: var(--panel); color: var(--muted); }
@@ -110,3 +108,7 @@ tr.clickable:hover td { background: #1d2730; }
 .status-line { color: var(--muted); font-size: 12px; padding: 4px 14px; min-height: 20px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .muted { color: var(--muted); }
+
+@media (max-height: 700px) {
+  .waterfall canvas { height: 100px !important; }
+}

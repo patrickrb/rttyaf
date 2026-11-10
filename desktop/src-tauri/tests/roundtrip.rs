@@ -1,57 +1,46 @@
-//! M1 acceptance gate: a Rust port of ft8af_glue/test_roundtrip.c.
-//!
-//! Proves the C ft8_lib core links and is self-consistent through the Rust FFI:
-//! pack a known message -> encode to tones -> synthesize the GFSK waveform ->
-//! feed it back through the monitor + sync search + LDPC decoder and confirm the
-//! original text is recovered. This is the gate for the whole project.
-
-use ft8af::dsp::{encode, Decoder, SAMPLE_RATE, SLOT_SAMPLES};
+use rttyaf::dsp::{encode, Decoder, RttyConfig};
 
 #[test]
-fn encode_then_decode_recovers_message() {
-    let expected = "CQ K1ABC FN42";
-    let freq_hz = 1000.0;
-
-    // 1. pack -> 2. encode -> 3. synth GFSK into a full 15 s slot buffer.
-    let payload = encode::pack77(expected).expect("pack77 should accept a standard CQ");
-    let tones = encode::encode_tones(&payload);
-    let mut signal = vec![0.0f32; SLOT_SAMPLES];
-    encode::synth_gfsk(&tones, freq_hz, SAMPLE_RATE, &mut signal, 0);
-
-    // 4-5. monitor -> find_sync -> decode.
-    let mut decoder = Decoder::new(SAMPLE_RATE, true);
-    decoder.feed_slot(&signal);
-    let n = decoder.find_sync();
-    assert!(n > 0, "expected at least one sync candidate, got {n}");
-
-    let messages = decoder.decode_all();
-    assert!(
-        !messages.is_empty(),
-        "decoder found {n} candidates but decoded nothing"
-    );
-
-    let recovered = messages.iter().find(|m| m.raw_text == expected);
-    assert!(
-        recovered.is_some(),
-        "original message not recovered; decoded texts: {:?}",
-        messages.iter().map(|m| &m.raw_text).collect::<Vec<_>>()
-    );
-
-    let m = recovered.unwrap();
-    assert_eq!(m.call_to, "CQ");
-    assert_eq!(m.call_from, "K1ABC");
-    assert_eq!(m.grid, "FN42");
-    // The signal was synthesized at 1000 Hz; decoder should land close.
-    assert!(
-        (m.freq_hz - freq_hz).abs() < 10.0,
-        "frequency off: {} Hz",
-        m.freq_hz
-    );
+fn on_air_tones_and_cumulative_bit_timing() {
+    for reverse in [false, true] {
+        let config = RttyConfig {
+            reverse,
+            ..Default::default()
+        };
+        let signal = encode("E", config).unwrap(); // LTRS + E: 20 + 2*7.5 bits
+        assert_eq!(signal.len(), 9241);
+        let preamble_end = (16.0 * 12000.0 / 45.45_f64).round() as usize;
+        let crossing_count = signal[..preamble_end]
+            .windows(2)
+            .filter(|p| p[0] <= 0.0 && p[1] > 0.0)
+            .count();
+        let measured_mark = crossing_count as f64 * 12000.0 / preamble_end as f64;
+        assert!((measured_mark - if reverse { 2295.0 } else { 2125.0 }).abs() < 4.0);
+        // First frame is LTRS: exactly one space START then five mark bits.
+        let bit_end = (17.0 * 12000.0 / 45.45_f64).round() as usize;
+        let crossings = signal[preamble_end..bit_end]
+            .windows(2)
+            .filter(|p| p[0] <= 0.0 && p[1] > 0.0)
+            .count();
+        let measured_space = crossings as f64 * 12000.0 / (bit_end - preamble_end) as f64;
+        assert!((measured_space - if reverse { 2125.0 } else { 2295.0 }).abs() < 50.0);
+    }
 }
 
 #[test]
-fn generate_ft8_produces_expected_length() {
-    let signal = encode::generate_ft8("CQ K1ABC FN42", 1000.0, SAMPLE_RATE).unwrap();
-    // 79 symbols * 0.16 s * 12000 Hz = 151680 samples (+ rounding).
-    assert_eq!(signal.len(), 151680);
+fn modest_noise_and_tuning_error_keep_nontrivial_text() {
+    let config = RttyConfig::default();
+    let signal = encode("CQ K1ABC DE KS3CKC 599 73\r\n", config).unwrap();
+    let noisy: Vec<_> = signal
+        .iter()
+        .enumerate()
+        .map(|(i, &s)| s + (((i * 7919 % 997) as f32 / 997.0) - 0.5) * 0.06)
+        .collect();
+    let mut decoder = Decoder::new(RttyConfig {
+        mark_hz: 2130.0,
+        ..config
+    })
+    .unwrap();
+    let decoded: String = noisy.chunks(1440).map(|c| decoder.process(c)).collect();
+    assert_eq!(decoded, "CQ K1ABC DE KS3CKC 599 73\r\n");
 }

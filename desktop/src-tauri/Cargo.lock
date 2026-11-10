@@ -979,33 +979,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ft8af"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cc",
- "chrono",
- "cpal",
- "dirs 5.0.1",
- "libloading 0.8.9",
- "log",
- "once_cell",
- "parking_lot",
- "ringbuf",
- "rubato",
- "rusqlite",
- "rustfft",
- "serde",
- "serde_json",
- "serialport",
- "tauri",
- "tauri-build",
- "thiserror 1.0.69",
- "tokio",
- "ureq",
-]
-
-[[package]]
 name = "futures-channel"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2886,6 +2859,32 @@ dependencies = [
  "crossbeam-utils",
  "portable-atomic",
  "portable-atomic-util",
+]
+
+[[package]]
+name = "rttyaf"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "cpal",
+ "dirs 5.0.1",
+ "libloading 0.8.9",
+ "log",
+ "once_cell",
+ "parking_lot",
+ "ringbuf",
+ "rubato",
+ "rusqlite",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "serialport",
+ "tauri",
+ "tauri-build",
+ "thiserror 1.0.69",
+ "tokio",
+ "ureq",
 ]
 
 [[package]]

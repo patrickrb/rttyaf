@@ -1,0 +1,6 @@
+# id baud shift mark stop reverse usos text (literal \r and \n are controls)
+standard	45.45	170	2125	1.5	false	true	cq K1ABC 599 73\r\n
+reverse	50	425	1275	1.5	true	true	RY 123 456 TEST\r\n
+fast	75	850	1275	1	false	false	A1 2B $4?\r\n
+short-stop	45.45	200	2125	0.3	false	true	RYRY 12 34 CQ\r\n
+fractional	45.45	170	2125	1.5	false	true	THE QUICK BROWN FOX 0123456789 RYRYRYRYRYRYRYRYRYRYRYRYRYRYRYRYRYRYRYRY
