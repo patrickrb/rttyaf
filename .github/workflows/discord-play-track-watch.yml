@@ -10,16 +10,69 @@ on:
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:
+    inputs:
+      inspection_only:
+        description: Inspect internal code 1062 only; no Discord, state writes or publishing
+        type: boolean
+        default: false
+      reviewed_sha:
+        description: Exact feat/* SHA approved by Reid-n0rc on its open PR (inspection only)
+        type: string
+        required: false
 
 permissions:
   contents: write   # needed to push state to the orphan branch
 
 concurrency:
-  group: discord-play-track-watch
+  # Inspection must not invalidate an in-flight publisher's Play edit.
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.inspection_only && 'play-publish' || 'discord-play-track-watch' }}
   cancel-in-progress: false
 
 jobs:
+  inspect:
+    if: github.event_name == 'workflow_dispatch' && inputs.inspection_only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Require independent approval of this exact inspection source
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: python3 .github/scripts/internal_approval.py
+
+      - name: Install inspection dependencies
+        run: pip install --quiet google-auth requests
+
+      - name: Inspect internal track and delete disposable edit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          INSPECTION_OUTPUT: ${{ runner.temp }}/play-internal-inspection.json
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/internal_approval.py
+          python3 .github/scripts/play_internal_inspect.py
+
+      - name: Preserve inspection and cleanup receipt, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: play-internal-inspection-${{ github.run_id }}
+          path: ${{ runner.temp }}/play-internal-inspection.json
+          if-no-files-found: warn
+
   watch:
+    if: github.event_name != 'workflow_dispatch' || !inputs.inspection_only
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo (for the script)

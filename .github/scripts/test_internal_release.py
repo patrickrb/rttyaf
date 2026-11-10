@@ -12,6 +12,7 @@ import unittest
 import yaml
 
 from internal_approval import REPOSITORY, require_approval, require_source
+from play_internal_inspect import API as INSPECTION_API, inspect_internal
 from play_internal_receipt import PACKAGE, build_receipt, fetch_tracks
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -117,6 +118,29 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("output-metadata.json", receipt["run"])
         self.assertIn("github.event_name == 'workflow_dispatch'", self.android["concurrency"]["group"])
         self.assertEqual("false", self.android["concurrency"]["cancel-in-progress"])
+
+    def test_inspection_is_read_only_reviewed_and_excludes_watcher_side_effects(self):
+        workflow = self.workflows["discord-play-track-watch.yml"]
+        inspect = workflow["jobs"]["inspect"]
+        self.assertEqual("github.event_name == 'workflow_dispatch' && inputs.inspection_only",
+                         inspect["if"])
+        self.assertEqual("github.event_name != 'workflow_dispatch' || !inputs.inspection_only",
+                         workflow["jobs"]["watch"]["if"])
+        self.assertEqual({"contents": "read", "pull-requests": "read"}, inspect["permissions"])
+        self.assertEqual("false", workflow["concurrency"]["cancel-in-progress"])
+        self.assertIn("&& 'play-publish'", workflow["concurrency"]["group"])
+        steps = inspect["steps"]
+        credential_step = next(step for step in steps
+                               if "PLAY_SERVICE_ACCOUNT_JSON" in step.get("env", {}))
+        self.assertEqual("${{ inputs.reviewed_sha }}", credential_step["env"]["REVIEWED_SHA"])
+        self.assertEqual(["set -euo pipefail", "python3 .github/scripts/internal_approval.py",
+                          "python3 .github/scripts/play_internal_inspect.py"],
+                         credential_step["run"].splitlines())
+        self.assertNotIn("continue-on-error", credential_step)
+        self.assertTrue(any(step.get("run") == "python3 .github/scripts/internal_approval.py"
+                            for step in steps[:steps.index(credential_step)]))
+        self.assertEqual("always()", steps[-1]["if"])
+        self.assertIn("actions/upload-artifact@", steps[-1]["uses"])
 
 
 class ApprovalTest(unittest.TestCase):
@@ -308,6 +332,97 @@ class ReceiptTest(unittest.TestCase):
             fetch_tracks(Session(False))
         with self.assertRaises(RuntimeError):
             fetch_tracks(Session(True))
+
+
+class DisposableEditInspectionTest(unittest.TestCase):
+    class Play:
+        """Fake Play surface allowing only open, internal-track GET and DELETE."""
+
+        def __init__(self, releases, fail=None):
+            self.releases = releases
+            self.fail = fail
+            self.edit_open = False
+
+        def post(self, url, timeout):
+            assert url == f"{INSPECTION_API}/edits" and not self.edit_open
+            if self.fail == "post":
+                raise RuntimeError("POST failed")
+            self.edit_open = True
+            return self.response({"id": "temporary-edit"})
+
+        def get(self, url, timeout):
+            assert url == f"{INSPECTION_API}/edits/temporary-edit/tracks/internal"
+            assert self.edit_open
+            if self.fail == "get":
+                raise RuntimeError("GET failed")
+            return self.response({"track": "internal", "releases": self.releases})
+
+        def delete(self, url, timeout):
+            assert url == f"{INSPECTION_API}/edits/temporary-edit" and self.edit_open
+            if self.fail == "delete-transport":
+                raise RuntimeError("DELETE failed")
+            if self.fail == "delete-http":
+                return self.response({}, failed=True)
+            self.edit_open = False
+            return self.response({})
+
+        @staticmethod
+        def response(data, failed=False):
+            class Response:
+                def raise_for_status(self):
+                    if failed:
+                        raise RuntimeError("HTTP failure")
+
+                def json(self):
+                    return copy.deepcopy(data)
+            return Response()
+
+    def test_actual_completed_or_draft_is_preserved_without_mutation(self):
+        for status in ("completed", "draft"):
+            with self.subTest(status=status):
+                releases = [{"name": "1.2.1-dev.62", "versionCodes": ["1062"], "status": status},
+                            {"name": "not-the-requested-code", "versionCodes": ["10620"],
+                             "status": "inProgress", "userFraction": 0.1}]
+                play = self.Play(copy.deepcopy(releases))
+                receipt = inspect_internal(play)
+                self.assertEqual(releases, receipt["internalReleases"])
+                self.assertEqual([releases[0]], receipt["matchingReleases"])
+                self.assertEqual(releases, play.releases)
+                self.assertEqual([], receipt["errors"])
+                self.assertTrue(receipt["editDeleted"])
+                self.assertFalse(play.edit_open)
+                self.assertIn("not verified", receipt["testerAvailability"])
+
+    def test_absent_code_is_not_reported_as_available(self):
+        receipt = inspect_internal(self.Play([
+            {"versionCodes": ["1013"], "status": "completed"}]))
+        self.assertEqual([], receipt["matchingReleases"])
+        self.assertEqual([], receipt["errors"])
+        self.assertTrue(receipt["editDeleted"])
+
+    def test_read_failure_still_deletes_edit_and_is_not_empty_success(self):
+        play = self.Play([], fail="get")
+        receipt = inspect_internal(play)
+        self.assertTrue(receipt["errors"])
+        self.assertTrue(receipt["editDeleted"])
+        self.assertFalse(play.edit_open)
+
+    def test_delete_http_and_transport_failures_are_reported(self):
+        for failure in ("delete-http", "delete-transport"):
+            with self.subTest(failure=failure):
+                play = self.Play([{"versionCodes": [1062], "status": "draft"}], fail=failure)
+                receipt = inspect_internal(play)
+                self.assertEqual("draft", receipt["matchingReleases"][0]["status"])
+                self.assertFalse(receipt["editDeleted"])
+                self.assertTrue(play.edit_open)
+                self.assertEqual(["DELETE edit failed: RuntimeError"], receipt["errors"])
+
+    def test_failed_open_is_not_retried_or_claimed_deleted(self):
+        receipt = inspect_internal(self.Play([], fail="post"))
+        self.assertIsNone(receipt["editId"])
+        self.assertFalse(receipt["editDeleted"])
+        self.assertEqual(["Inspection failed: RuntimeError",
+                          "No edit ID received; DELETE could not be attempted"], receipt["errors"])
 
 
 if __name__ == "__main__":
