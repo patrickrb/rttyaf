@@ -438,8 +438,12 @@ function DecodeScreen(props: {
         <label>Shift <select aria-label="RTTY shift Hz" value={modem.shift_hz} onChange={(e) => {
           const shift_hz = Number(e.target.value); onModem({ ...modem, shift_hz, mark_hz: Math.min(modem.mark_hz, 3000 - shift_hz) });
         }}>{[170, 200, 425, 850].map((n) => <option key={n}>{n}</option>)}</select> Hz</label>
-        <label>Lower tone <input aria-label="Lower tone Hz" type="number" min={500} max={3000 - modem.shift_hz} value={modem.mark_hz}
-          onChange={(e) => { const mark_hz = Number(e.target.value); if (mark_hz >= 500 && mark_hz + modem.shift_hz <= 3000) onModem({ ...modem, mark_hz }); }} /> Hz</label>
+        <label>Lower tone <input key={modem.mark_hz} aria-label="Lower tone Hz" type="number" required min={500} max={3000 - modem.shift_hz} defaultValue={modem.mark_hz}
+          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          onBlur={(e) => {
+            if (e.currentTarget.checkValidity()) onModem({ ...modem, mark_hz: Number(e.currentTarget.value) });
+            else e.currentTarget.value = String(modem.mark_hz);
+          }} /> Hz</label>
         <label>Stop <select aria-label="Stop bits" value={modem.stop_bits} onChange={(e) => onModem({ ...modem, stop_bits: Number(e.target.value) })}>
           {[1, 1.5, 2].map((n) => <option key={n}>{n}</option>)}
         </select></label>
