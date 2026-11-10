@@ -19,9 +19,9 @@ This is the shared guidance for humans and coding agents. `CLAUDE.md` points her
   see [docs/shared-radio-core.md](docs/shared-radio-core.md) for update rules.
 - `rttyaf/app/src/androidTest/`: instrumented tests requiring Android hardware
   or an emulator outside an orb.
-- `desktop/`, `ios/`: legacy FT8 ports, not the Android RTTY app. Their native
-  builds still reference the removed `ft8af/` tree. See development limitations;
-  do not silently restore FT8 code or treat these as working RTTY targets.
+- `desktop/`: Tauri/Rust RTTY app for Linux, macOS and Windows; see its README
+  for build commands. iOS is not a supported target; its legacy FT8 scaffold
+  and CI have been retired. Do not restore an iOS port or FT8 DSP for this app.
 - `.github/workflows/`: CI and publishing; `docs/release-pipeline.md` describes
   releases. Never use release workflows as a local test command.
 
@@ -69,9 +69,10 @@ No web server or `.agents/resume` is needed for the host build/test workflow.
   signing material, local SDK paths or build outputs.
 - Pushes, PR creation, merges and releases require the user's authorization.
   Merging to `main` triggers publishing; do not trigger it merely to verify setup.
-  Android publishes internally, but desktop publishes a production release on
-  every `main` push. For the current shared-core rollout, **never merge main or
-  push production tags**. The Android workflow's INTERNAL-only feature-ref
+  Android main publishes to Play internal and desktop main publishes a
+  `desktop-dev.*` prerelease. Neither authorizes production tags or promotion.
+  Preserve required human review and obtain owner authorization before merging.
+  The Android workflow's INTERNAL-only feature-ref
   dispatch requires Reid-n0rc's approval of the exact commit on an open, ready
   PR and GitHub's clean mergeability state; agent review is not human approval.
   Follow [the internal handoff](docs/release-pipeline.md#reviewed-feature-ref-internal-delivery).
